@@ -7,7 +7,53 @@ from dassl.utils import mkdir_if_missing
 from .oxford_pets import OxfordPets
 from .dtd import DescribableTextures as DTD
 
-NEW_CNAMES = {}
+NEW_CNAMES = {
+"airplane":"airplane",
+"airport":"airport",
+"baseball_diamond":"baseball diamond",
+"basketball_court":"basketball court",
+"beach":"beach",
+"bridge":"bridge",
+"chaparral":"chaparral",
+"church":"church",
+"circular_farmland":"circular farmland",
+"cloud":"cloud",
+"commercial_area":"commercial area",
+"dense_residential":"dense residential",
+"desert":"desert",
+"forest":"forest",
+"freeway":"freeway",
+"golf_course":"golf course",
+"ground_track_field":"ground track field",
+"harbor":"harbor",
+"industrial_area":"industrial area",
+"intersection":"intersection",
+"island":"island",
+"lake":"lake",
+"meadow":"meadow",
+"medium_residential":"medium residential",
+"mobile_home_park":"mobile home park",
+"mountain":"mountain",
+"overpass":"overpass",
+"palace":"palace",
+"parking_lot":"parking lot",
+"railway":"railway",
+"railway_station":"railway station",
+"rectangular_farmland":"rectangular farmland",
+"river":"river",
+"roundabout":"roundabout",
+"runway":"runway",
+"sea_ice":"sea ice",
+"ship":"ship",
+"snowberg":"snowberg",
+"sparse_residential":"sparse residential",
+"stadium":"stadium",
+"storage_tank":"storage tank",
+"tennis_court":"tennis court",
+"terrace":"terrace",
+"thermal_power_station":"thermal power station",
+"wetland":"wetland",    
+}
 
 
 @DATASET_REGISTRY.register()
@@ -54,3 +100,11 @@ class RESISC45(DatasetBase):
         # super().__init__(train_x=train, val=val, test=test, train_u=train_all)
         super().__init__(train_x=train, val=val, test=test)
 
+    def update_classname(self, dataset_old):
+        dataset_new = []
+        for item_old in dataset_old:
+            cname_old = item_old.classname
+            cname_new = NEW_CLASSNAMES[cname_old]
+            item_new = Datum(impath=item_old.impath, label=item_old.label, classname=cname_new)
+            dataset_new.append(item_new)
+        return dataset_new

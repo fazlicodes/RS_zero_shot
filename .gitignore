@@ -3,3 +3,14 @@ all_weights/
 .vscode/
 Dassl.pytorch/
 output/
+
+embeddings/
+
+# Python specific
+*.pyc
+*.pyo
+__pycache__/
+
+# Environments
+venv/
+env/

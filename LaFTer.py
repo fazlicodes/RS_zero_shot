@@ -22,6 +22,8 @@ import datasets.cifar
 import trainers.LaFTer as lafter_uft
 from utils.utils import *
 import os
+from dassl.utils import Registry
+from datasets import RESISC45
 
 
 def print_args(args, cfg):
@@ -275,6 +277,11 @@ def main(args):
     print_args(args, cfg)
     if torch.cuda.is_available() and cfg.USE_CUDA:
         torch.backends.cudnn.benchmark = True
+    
+    dataset_registary = Registry("Dataset")
+
+    dataset_registary.register(RESISC45)
+
     trainer = build_trainer(cfg)
     model = trainer.model
     model.args = args
@@ -364,5 +371,6 @@ if __name__ == "__main__":
     parser.add_argument('--logfolder', default='logs', type=str)
     args = parser.parse_args()
     args.mile_stones = None
+    
     main(args)
 
