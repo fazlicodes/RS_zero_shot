@@ -1,0 +1,9 @@
+conda create --name lafter python=3.8.8
+conda activate lafter
+conda install pytorch==1.9.1 torchvision torchaudio==0.9.1 cudatoolkit=11.1
+cd Dassl.
+pip install -r requirements
+python setup.py develop
+cd ../
+pip install clip_by_openai==1.1
+pip install -r requirements.txt
