@@ -240,16 +240,16 @@ def train_lafter(args, model, tr_loader, val_loader):
             out = model.forward_aug_with_prompts(input[1].float().cuda())
 
             # get the pseudo label from zeroshot
-            pl_zero_shot = model(input[0])
+            pl_zero_shot = model.forward_pl_zeroshot(input[0])
             pl_zero_shot = F.softmax(pl_zero_shot, dim=-1)  # / 0.04
             pl_zero_shot = pl_zero_shot.argmax(dim=1, keepdim=True)
             pl_zero_shot = pl_zero_shot.flatten().cuda()
-            pl_zeroshot_acc.update((pl_zero_shot == batch["label"][0].cuda()).sum().item() / len(batch["label"][0]), len(batch["label"][0]))
+            pl_zeroshot_acc.update((pl_zero_shot == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
 
             pseudo_label = F.softmax(pl, dim=-1)  # / 0.04
             pseudo_label = pseudo_label.argmax(dim=1, keepdim=True)
             pseudo_label = pseudo_label.flatten().cuda()
-            pl_acc.update((pseudo_label == batch["label"][0].cuda()).sum().item() / len(batch["label"][0]), len(batch["label"][0]))
+            pl_acc.update((pseudo_label == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
 
             loss = criteria(out.squeeze(), pseudo_label)
             if i % args.print_freq == 0:

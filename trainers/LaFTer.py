@@ -166,8 +166,11 @@ class LaFTerUFT(nn.Module):
             image_features /= image_features.norm(dim=-1, keepdim=True)
             return image_features
         
-    def forward_refined_pl(self, x):
-        pass
+    def forward_pl_zeroshot(self, x):
+        with torch.no_grad():
+            img_features = self.image_features(x)
+            pseudo_label = img_features @ self.text_features.float()
+        return pseudo_label
     
     def eval_clip(self, x):
         with torch.no_grad():
