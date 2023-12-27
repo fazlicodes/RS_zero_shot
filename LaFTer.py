@@ -215,13 +215,14 @@ def train_lafter(args, model, tr_loader, val_loader):
     optimizer, scheduler, criteria = setup_lafter_training_utils(args, model)
     batch_time = lossmeter()
     data_time = lossmeter()
+    
     best_acc = 0
     for epoch in range(args.epochs):
         print(f'Epoch: {epoch}')
         model.eval()
         model.adapter.train()
         end = time.time()
-
+        pl_acc = lossmeter()
         for i, batch in enumerate((tr_loader)):
             data_time.update(time.time() - end)
             batch_time.update(time.time() - end)
@@ -238,7 +239,7 @@ def train_lafter(args, model, tr_loader, val_loader):
             pseudo_label = F.softmax(pl, dim=-1)  # / 0.04
             pseudo_label = pseudo_label.argmax(dim=1, keepdim=True)
             pseudo_label = pseudo_label.flatten().cuda()
-
+            pl_acc.update((pseudo_label == batch["label"][0].cuda()).sum().item() / len(batch["label"][0]), len(batch["label"][0]))
             loss = criteria(out.squeeze(), pseudo_label)
             if i % args.print_freq == 0:
                 print(
@@ -260,7 +261,7 @@ def train_lafter(args, model, tr_loader, val_loader):
         acc = test_prompting(val_loader, model)
         print(f'TOP-1 Accuracy: {acc}')
         all_acc.append(acc)
-
+        print(f'Pseudo Label Accuracy: {pl_acc.avg}')
         if acc>best_acc:
             torch.save(
                 {
@@ -291,7 +292,6 @@ def main(args):
         torch.backends.cudnn.benchmark = True
     
     dataset_registary = Registry("Dataset")
-
     dataset_registary.register(RESISC45)
 
     trainer = build_trainer(cfg)
