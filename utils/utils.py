@@ -112,7 +112,15 @@ def setup_lafter_training_utils(args, model):
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, args.mile_stones, 0.60)
     criteria = LabelSmoothingCrossEntropy()
     return optimizer, scheduler, criteria
-def test_prompting(teloader, model):
+
+def test_prompting(teloader, model,model_path=None):
+
+    # if model_path:
+    #     pretrained_model = torch.load(model_path, map_location=model.device)
+    #     state_dict = pretrained_model["state_dict"]
+    #     model.adapter.load_state_dict(state_dict)
+    #     model.prompt_embeddings=pretrained_model['prompt_emb']
+
     model.eval()
     batch_time = AverageMeter('Time', ':6.3f')
     top1 = AverageMeter('Acc@1', ':6.2f')
@@ -258,10 +266,16 @@ class AverageMeter(object):
         return fmtstr.format(**self.__dict__)
 
 
-def zero_shot(model, loader):
+def zero_shot(model, loader, model_path=None):
     print('-------------- ZERO SHOT INFERENCE --------------')
     total = 0.
     correct_base = 0.
+    if model_path:
+        pretrained_model = torch.load(model_path, map_location=model.device)
+        state_dict = pretrained_model["state_dict"]
+        model.adapter.load_state_dict(state_dict)
+        model.prompt_embeddings=pretrained_model['prompt_emb']
+
     model.eval()
     with torch.no_grad():
         for i, inputs in enumerate(tqdm(loader)):

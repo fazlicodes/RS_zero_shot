@@ -215,6 +215,7 @@ def train_lafter(args, model, tr_loader, val_loader):
     optimizer, scheduler, criteria = setup_lafter_training_utils(args, model)
     batch_time = lossmeter()
     data_time = lossmeter()
+    best_acc = 0
     for epoch in range(args.epochs):
         print(f'Epoch: {epoch}')
         model.eval()
@@ -259,8 +260,19 @@ def train_lafter(args, model, tr_loader, val_loader):
         acc = test_prompting(val_loader, model)
         print(f'TOP-1 Accuracy: {acc}')
         all_acc.append(acc)
-    print(f'-------------------------------- Best Accuracy: {max(all_acc)} --------------------------------')
 
+        if acc>best_acc:
+            torch.save(
+                {
+                "state_dict": model.adapter.state_dict(),
+                "prompt_emb":model.prompt_embeddings,
+                "epoch":epoch,
+                "accuracy":acc,
+                },
+                os.path.join(args.output_dir, "model_best.pth"))
+            best_acc = acc
+    print(f'-------------------------------- Best Accuracy: {max(all_acc)} --------------------------------')
+    
 def main(args):
     cfg = setup_cfg(args)
     cfg.DATALOADER.TRAIN_X.BATCH_SIZE = args.batch_size
@@ -286,13 +298,17 @@ def main(args):
     model = trainer.model
     model.args = args
     test_loader = trainer.test_loader
+    val_loader = trainer.val_loader
     train_loader = trainer.train_loader_x
 
     if args.zero_shot:
         zero_shot(model, test_loader)
+        # acc = test_prompting(test_loader, model, model_path="/home/mohamed.imam/Thesis/RS_zero_shot/output/LaFTer/vit_b32/resisc45/model_best.pth")
+        # print(f'final accuracy:{acc}')
     else:
-        train_lafter(args, model,train_loader, test_loader)
-
+        train_lafter(args, model,train_loader, val_loader)
+        acc = test_prompting(test_loader, model, model_path="/home/mohamed.imam/Thesis/RS_zero_shot/output/LaFTer/vit_b32/resisc45/model_best.pth")
+        print(f'final accuracy:{acc}')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
