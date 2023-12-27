@@ -165,7 +165,10 @@ class LaFTerUFT(nn.Module):
             image_features = self.model.encode_image(images)
             image_features /= image_features.norm(dim=-1, keepdim=True)
             return image_features
-
+        
+    def forward_refined_pl(self, x):
+        pass
+    
     def eval_clip(self, x):
         with torch.no_grad():
             img_features_2 = self.incorporate_prompt(x)
