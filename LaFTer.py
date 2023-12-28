@@ -285,6 +285,10 @@ def train_lafter(args, model, tr_loader, val_loader):
         all_acc.append(acc)
         print(f'Pseudo Label Accuracy: {pl_acc.avg}')
         print(f'Pseudo Label Zero Shot Accuracy: {pl_zeroshot_acc.avg}')
+
+        if epoch % 5 == 0:
+            print(f'text_features: {model.text_features.float()}')
+
         if acc>best_acc:
             torch.save(
                 {
