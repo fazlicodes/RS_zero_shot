@@ -253,6 +253,11 @@ class LaFTer(TrainerX):
                                           templates=['a photo of a {}'], ds_templates = ds_specific_templates[cfg.DATASET.NAME], dataset_name= cfg.DATASET.NAME, txt_cls = cfg.txt_cls, cfg=cfg)
         self.register_model("adapt", self.model)
         device_count = torch.cuda.device_count()
+        
+        #  freeze clip
+        for param in self.model.model.parameters():
+            param.requires_grad = False
+        
         if device_count > 1:
             print(f"Multiple GPUs detected (n_gpus={device_count}), use all of them!")
             self.model = nn.DataParallel(self.model)
