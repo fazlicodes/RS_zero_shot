@@ -12,6 +12,7 @@ CUDA_VISIBLE_DEVICES=0 python LaFTer.py \
 --epochs 50 \
 --dataset-config-file configs/datasets/"${dset}".yaml \
 --config-file configs/trainers/text_cls/${CFG}.yaml \
---output-dir output/${TRAINER}/${CFG}/"${dset}-onval_set" \
+--output-dir output/${TRAINER}/${CFG}/"${dset}-text_only" \
 --lr 0.0005 \
---txt_cls ${txt_cls}
+--txt_cls ${txt_cls} \
+--text_only

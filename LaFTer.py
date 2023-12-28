@@ -224,8 +224,9 @@ def train_lafter(args, model, tr_loader, val_loader):
         end = time.time()
 
         pl_acc = lossmeter()
+        pl_acc.reset()
         pl_zeroshot_acc = lossmeter()
-
+        pl_zeroshot_acc.reset()
         for i, batch in enumerate((tr_loader)):
             data_time.update(time.time() - end)
             batch_time.update(time.time() - end)
@@ -239,29 +240,28 @@ def train_lafter(args, model, tr_loader, val_loader):
             out_text = model.forward_normal_for_pl(input[0])
             out = model.forward_aug_with_prompts(input[1].float().cuda())
 
-            # get the pseudo label from zeroshot
-            out_zero_shot = model.forward_pl_zeroshot(input[0])
-            pl_zero_shot = F.softmax(out_zero_shot, dim=-1).argmax(dim=1, keepdim=True)
-            # pl_zero_shot_sm = pl_zero_shot_sm.argmax(dim=1, keepdim=True)
-            # pl_zero_shot_sm = pl_zero_shot.flatten().cuda()
-            pl_zeroshot_acc.update((pl_zero_shot == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
-
-
-            pl_text = F.softmax(out_text, dim=-1).argmax(dim=1, keepdim=True)
-            # pseudo_label = pseudo_label.argmax(dim=1, keepdim=True)
-            # pseudo_label = pseudo_label.flatten().cuda()
+            pl_text = F.softmax(out_text, dim=-1).argmax(dim=1, keepdim=True).flatten()
             pl_acc.update((pl_text == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
 
-            #BWS Computation alpha = softmax(concat(pl_zs, pl))
-            alpha = F.softmax(torch.cat([pl_zero_shot, pl_text], dim=1), dim=-1)
+            if not args.text_only:
 
-            # compute the new pl
-            pl_new = (alpha[:, 0] * out_zero_shot + alpha[:, 1] * out_text)
+                # get the pseudo label from zeroshot
+                out_zero_shot = model.forward_pl_zeroshot(input[0])
+                pl_zero_shot = F.softmax(out_zero_shot, dim=-1).argmax(dim=1, keepdim=True).flatten()
+                pl_zeroshot_acc.update((pl_zero_shot == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
 
-            pl_new = F.softmax(pl_new, dim=-1).argmax(dim=1, keepdim=True)
+                #BWS Computation alpha = softmax(concat(pl_zs, pl))
+                alpha = torch.cat([torch.max(F.softmax(out_zero_shot),dim=1)[0].unsqueeze(1),torch.max(F.softmax(out_text),dim=1)[0].unsqueeze(1)], dim=-1)
+                alpha = F.softmax(alpha, dim=-1)
 
-            loss = criteria(out.squeeze(), pl_new)
-            # loss = criteria(out.squeeze(), pl_text)
+                # compute the new pl
+                pl_new = (out_zero_shot*alpha[:, 0].unsqueeze(1) +  out_text*alpha[:, 1].unsqueeze(1))
+                pl_new = torch.flatten(F.softmax(pl_new, dim=-1).argmax(dim=1, keepdim=True))
+
+                pl_text = pl_new
+
+            # loss = criteria(out.squeeze(), pl_new)
+            loss = criteria(out.squeeze(), pl_text)
             
             if i % args.print_freq == 0:
                 print(
@@ -408,6 +408,7 @@ if __name__ == "__main__":
     parser.add_argument('--epochs', type=int, default=50)
     parser.add_argument('--txt_epochs', type=int, default=1000)
     parser.add_argument('--logfolder', default='logs', type=str)
+    parser.add_argument('--text_only', action="store_true")
     args = parser.parse_args()
     args.mile_stones = None
     
