@@ -3,6 +3,7 @@ all_weights/
 .vscode/
 Dassl.pytorch/
 output/
+scripts/.*
 
 embeddings/
 

@@ -115,10 +115,11 @@ def setup_lafter_training_utils(args, model):
 
 def test_prompting(teloader, model,model_path=None):
     if model_path:
-        pretrained_model = torch.load(model_path, map_location=model.device)
-        state_dict = pretrained_model["state_dict"]
-        model.adapter.load_state_dict(state_dict)
-        model.prompt_embeddings=pretrained_model['prompt_emb']
+        model.load_state_dict(torch.load(model_path))
+        # pretrained_model = torch.load(model_path, map_location=model.device)
+        # state_dict = pretrained_model["state_dict"]
+        # model.adapter.load_state_dict(state_dict)
+        # model.prompt_embeddings=pretrained_model['prompt_emb']
 
     model.eval()
     batch_time = AverageMeter('Time', ':6.3f')

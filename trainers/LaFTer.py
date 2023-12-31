@@ -20,7 +20,6 @@ from utils.data_utils import ds_specific_templates
 def load_clip_to_cpu(cfg):
     backbone_name = cfg.MODEL.BACKBONE.NAME
     url = clip._MODELS[backbone_name]
-    breakpoint()
     # model_path = clip._download(url, root='all_weights')
     # model_path="all_weights/RemoteCLIP-ViT-B-32.pt"
     model_path ="all_weights/RS5M_ViT-B-32.pt"

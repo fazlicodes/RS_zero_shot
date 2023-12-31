@@ -275,23 +275,25 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
         best_test_acc=None
         if val_acc>best_acc:
             best_val_acc="Yes"
-            best_test_acc = test_prompting(test_loader, model)
-
+            best_acc=val_acc
+            print('------------')
             print("Best Epoch ", epoch)
+            print("Best Val acc", val_acc)
+            best_test_acc = test_prompting(test_loader, model)
             print("Test acc ", best_test_acc)
+            print('------------')
 
             #Save the whole model
-            # torch.save(model.state_dict(), os.path.join(args.output_dir, "model_best.pth")) 
+            torch.save(model.state_dict(), os.path.join(args.output_dir, "model_best.pth")) 
 
-            torch.save(
-                {
-                "state_dict": model.adapter.state_dict(),
-                "prompt_emb":model.prompt_embeddings,
-                "epoch":epoch,
-                "accuracy":val_acc,
-                },
-                os.path.join(args.output_dir, "model_best.pth"))
-            best_acc = val_acc
+            # torch.save(
+            #     {
+            #     "state_dict": model.adapter.state_dict(),
+            #     "prompt_emb":model.prompt_embeddings,
+            #     "epoch":epoch,
+            #     "accuracy":val_acc,
+            #     },
+            #     os.path.join(args.output_dir, "model_best.pth"))
 
 
         df_to_append.append([epoch, epoch_loss, val_acc, best_test_acc, best_val_acc])
@@ -336,9 +338,9 @@ def main(args):
     else:
         train_lafter(args, model,train_loader, val_loader, test_loader=test_loader)
         test_acc = test_prompting(test_loader, model, model_path=os.path.join(args.output_dir,"model_best.pth"))
-        print(f'Final Test accuracy:{test_acc}')
+        print(f'Test accuracy (loading saved model):{test_acc}')
         val_acc = test_prompting(val_loader, model, model_path=os.path.join(args.output_dir,"model_best.pth"))
-        print(f'Final Val accuracy:{val_acc}')
+        print(f'Val accuracy (loading saved model):{val_acc}')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
