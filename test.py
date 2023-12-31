@@ -1,31 +1,14 @@
-import os
-import os
+import torch
 
-def print_folder_names(directory):
-    names=[]
-    for entry in os.scandir(directory):
-        if entry.is_dir():
-            # print(entry.name)
-            names.append(entry.name)
-    print(sorted(names))
-    with open('names.txt','w') as f:
-        for i in sorted(names):
-            f.write(f'"{i}":"{i.replace("_"," ")}",\n')
-# print_folder_names("data/resisc45/NWPU-RESISC45/NWPU-RESISC45/")
+# Assuming you have two tensors a and b with shape [50, 10]
+a = torch.rand((50, 10))
+b = torch.rand((50, 10))
 
-import json
+# Combine the tensors along a new dimension (e.g., concatenate along a new dimension)
+combined_tensor = torch.stack([a, b], dim=2)
 
-def update_json_keys(input_file, output_file):
-    with open(input_file, 'r') as file:
-        data = json.load(file)
-    
-    updated_data = {}
-    for key, value in data.items():
-        updated_key = key.replace(' ', '_')
-        updated_data[updated_key] = value
-    
-    with open(output_file, 'w') as file:
-        json.dump(updated_data, file, indent=4)
+# Average along the new dimension
+average_tensor = torch.mean(combined_tensor, dim=2)
 
-# Replace 'input.json' with your JSON file and 'output.json' with the desired output file name
-update_json_keys('./descriptions/generic/RESISC45.json', 'output.json')
+# Resulting tensor with shape [50, 10]
+print(average_tensor.shape)

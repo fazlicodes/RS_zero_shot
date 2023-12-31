@@ -5,9 +5,10 @@ TRAINER=LaFTer
 CFG=vit_b32
 dset="$1"
 txt_cls=lafter
-nos_epochs=5
+nos_epochs=20
 # v_encoder=georsclip-2epochs
-v_encoder="georsclip-${nos_epochs}refined_pl"
+# v_encoder="georsclip-${nos_epochs}-refined_pl"
+v_encoder="georsclip-${nos_epochs}-refined_pl-test"
 CUDA_VISIBLE_DEVICES=0 python LaFTer.py \
 --root ${DATA} \
 --trainer ${TRAINER} \

@@ -258,17 +258,35 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
                 pseudo_label_zero_shot = F.softmax(output_zs, dim=-1).argmax(dim=1, keepdim=True)
                 pseudo_label_zero_shot = pseudo_label_zero_shot.flatten().cuda()
                 pl_zs_acc.update((pseudo_label_zero_shot == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
+                
+                # Combine the tensors along a new dimension (e.g., concatenate along a new dimension)
+                combined_tensor = torch.stack([output_zs, output_text], dim=2)
 
-                # BWS Computation: Alpha = softmax(concat(pl_zs,pl_text))
-                alpha = torch.cat([torch.max(F.softmax(output_zs),dim=1)[0].unsqueeze(1),torch.max(F.softmax(output_text),dim=1)[0].unsqueeze(1)], dim=-1)
-                alpha = F.softmax(alpha, dim=-1)
+                # Average along the new dimension
+                average_tensor = torch.mean(combined_tensor, dim=2)
+                pseudo_label_text = F.softmax(average_tensor, dim=1)
+                pseudo_label_text = pseudo_label_text.argmax(dim=1)
 
-                # New Psuedo Label
-                pl_new = (output_zs*alpha[:, 0].unsqueeze(1) +  output_text*alpha[:, 1].unsqueeze(1))
-                pl_new = torch.flatten(F.softmax(pl_new, dim=-1).argmax(dim=1, keepdim=True))
+                # Ensure pseudo_label_text is 1D or flatten it
+                if pseudo_label_text.dim() > 1:
+                    pseudo_label_text = pseudo_label_text.view(-1)
 
-                #Change later
-                pseudo_label_text = pl_new
+                # print(pseudo_label_text.shape)
+                # print(pseudo_label_text.view(-1).shape)
+                # print(out.squeeze().shape)
+                # print(pseudo_label_text.shape)
+
+
+                # # BWS Computation: Alpha = softmax(concat(pl_zs,pl_text))
+                # alpha = torch.cat([torch.max(F.softmax(output_zs),dim=1)[0].unsqueeze(1),torch.max(F.softmax(output_text),dim=1)[0].unsqueeze(1)], dim=-1)
+                # alpha = F.softmax(alpha, dim=-1)
+
+                # # New Psuedo Label
+                # pl_new = (output_zs*alpha[:, 0].unsqueeze(1) +  output_text*alpha[:, 1].unsqueeze(1))
+                # pl_new = torch.flatten(F.softmax(pl_new, dim=-1).argmax(dim=1, keepdim=True))
+
+                # #Change later
+                # pseudo_label_text = pl_new
 
             loss = criteria(out.squeeze(), pseudo_label_text)
             if i % args.print_freq == 0:
