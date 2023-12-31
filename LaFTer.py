@@ -1,5 +1,6 @@
 import argparse
 import torch
+import pandas as pd
 import datetime
 from dassl.utils import setup_logger, set_random_seed, collect_env_info
 from dassl.config import get_cfg_default
@@ -206,7 +207,7 @@ def train_txt_cls(args, model):
         optimizer.step()
     model.txt_cls_init()
 
-def train_lafter(args, model, tr_loader, val_loader):
+def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
 
     # first train text classifier
     train_txt_cls(args, model)
@@ -216,11 +217,16 @@ def train_lafter(args, model, tr_loader, val_loader):
     batch_time = lossmeter()
     data_time = lossmeter()
     best_acc = 0
+    columns = ['Epoch', 'Epoch Loss', 'Validation Accuracy', 'Test Accuracy','Best Model']
+    # df = pd.DataFrame(columns=columns)
+    df_to_append = []
+
     for epoch in range(args.epochs):
         print(f'Epoch: {epoch}')
         model.eval()
         model.adapter.train()
         end = time.time()
+        total_loss = 0.0
 
         for i, batch in enumerate((tr_loader)):
             data_time.update(time.time() - end)
@@ -245,7 +251,7 @@ def train_lafter(args, model, tr_loader, val_loader):
                     "epoch [{0}/{1}][{2}/{3}]\t"
                     "loss {losses}\t"
                     "lr {lr:.6e}".format(
-                        epoch + 1,
+                        epoch,
                         args.epochs,
                         i + 1,
                         len(tr_loader),
@@ -256,22 +262,44 @@ def train_lafter(args, model, tr_loader, val_loader):
             loss.backward()
             optimizer.step()
         scheduler.step()
-        print(f'Evaluation: {epoch}')
-        acc = test_prompting(val_loader, model)
-        print(f'TOP-1 Accuracy: {acc}')
-        all_acc.append(acc)
+        
+        # Compute and save the epoch loss
+        epoch_loss = total_loss / len(tr_loader)
+        print(f'Epoch Loss: {epoch_loss}')
 
-        if acc>best_acc:
+        print(f'Evaluation: {epoch}')
+        val_acc = test_prompting(val_loader, model)
+        print(f'TOP-1 Accuracy: {val_acc}')
+        all_acc.append(val_acc)
+
+        best_test_acc=None
+        if val_acc>best_acc:
+            best_val_acc="Yes"
+            best_test_acc = test_prompting(test_loader, model)
+
+            print("Best Epoch ", epoch)
+            print("Test acc ", best_test_acc)
+
+            #Save the whole model
+            # torch.save(model.state_dict(), os.path.join(args.output_dir, "model_best.pth")) 
+
             torch.save(
                 {
                 "state_dict": model.adapter.state_dict(),
                 "prompt_emb":model.prompt_embeddings,
                 "epoch":epoch,
-                "accuracy":acc,
+                "accuracy":val_acc,
                 },
                 os.path.join(args.output_dir, "model_best.pth"))
-            best_acc = acc
-    print(f'-------------------------------- Best Accuracy: {max(all_acc)} --------------------------------')
+            best_acc = val_acc
+
+
+        df_to_append.append([epoch, epoch_loss, val_acc, best_test_acc, best_val_acc])
+    df = pd.DataFrame(df_to_append, columns=columns)    
+    csv_path = os.path.join(args.output_dir, "training_metrics.csv")
+    df.to_csv(csv_path, index=False)
+    print(f'-------------------------------- Best Validation Accuracy: {max(all_acc)} --------------------------------')
+    print(f'-------------------------------- Best Validation Accuracy Epoch: {all_acc.index(max(all_acc))} --------------------------------')
     
 def main(args):
     cfg = setup_cfg(args)
@@ -306,9 +334,11 @@ def main(args):
         # acc = test_prompting(test_loader, model, model_path="/home/mohamed.imam/Thesis/RS_zero_shot/output/LaFTer/vit_b32/resisc45/model_best.pth")
         # print(f'final accuracy:{acc}')
     else:
-        train_lafter(args, model,train_loader, val_loader)
-        acc = test_prompting(test_loader, model, model_path="/home/mohamed.imam/Thesis/RS_zero_shot/output/LaFTer/vit_b32/resisc45/model_best.pth")
-        print(f'final accuracy:{acc}')
+        train_lafter(args, model,train_loader, val_loader, test_loader=test_loader)
+        test_acc = test_prompting(test_loader, model, model_path=os.path.join(args.output_dir,"model_best.pth"))
+        print(f'Final Test accuracy:{test_acc}')
+        val_acc = test_prompting(val_loader, model, model_path=os.path.join(args.output_dir,"model_best.pth"))
+        print(f'Final Val accuracy:{val_acc}')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

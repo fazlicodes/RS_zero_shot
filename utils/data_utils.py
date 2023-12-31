@@ -1243,11 +1243,9 @@ ds_specific_templates = {
         'a centered satellite photo of the {}.',
     ],
     'RESISC45':[
-        'Describe a satellite photo of a(n) {}.',
-        'Describe a(n) {} as it would appear in an aerial image',
-        'How can you identify a(n) {} in an aerial photo?',
-        'Describe the satellite photo of a(n) {}',
-        'Describe an aerial photo of a(n) {}'
+        'a centered satellite photo of {}.',
+        'a centered satellite photo of a {}.',
+        'a centered satellite photo of the {}.',
     ],
     'OxfordFlowers': [
         'a photo of a {}, a type of flower.',

@@ -114,12 +114,11 @@ def setup_lafter_training_utils(args, model):
     return optimizer, scheduler, criteria
 
 def test_prompting(teloader, model,model_path=None):
-
-    # if model_path:
-    #     pretrained_model = torch.load(model_path, map_location=model.device)
-    #     state_dict = pretrained_model["state_dict"]
-    #     model.adapter.load_state_dict(state_dict)
-    #     model.prompt_embeddings=pretrained_model['prompt_emb']
+    if model_path:
+        pretrained_model = torch.load(model_path, map_location=model.device)
+        state_dict = pretrained_model["state_dict"]
+        model.adapter.load_state_dict(state_dict)
+        model.prompt_embeddings=pretrained_model['prompt_emb']
 
     model.eval()
     batch_time = AverageMeter('Time', ':6.3f')
@@ -270,6 +269,8 @@ def zero_shot(model, loader, model_path=None):
     print('-------------- ZERO SHOT INFERENCE --------------')
     total = 0.
     correct_base = 0.
+
+    #Loading Model
     if model_path:
         pretrained_model = torch.load(model_path, map_location=model.device)
         state_dict = pretrained_model["state_dict"]
