@@ -217,7 +217,7 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
     batch_time = lossmeter()
     data_time = lossmeter()
     best_acc = 0
-    columns = ['Epoch', 'Epoch Loss', 'Validation Accuracy', 'Test Accuracy','Best Model']
+    columns = ['Epoch', 'PS Text Acc','PS ZS Acc', 'Epoch Loss', 'Validation Accuracy', 'Test Accuracy','Best Model']
     # df = pd.DataFrame(columns=columns)
     df_to_append = []
 
@@ -227,6 +227,11 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
         model.adapter.train()
         end = time.time()
         total_loss = 0.0
+
+        pl_text_acc = lossmeter()
+        pl_text_acc.reset()
+        pl_zs_acc = lossmeter()
+        pl_zs_acc.reset()
 
         for i, batch in enumerate((tr_loader)):
             data_time.update(time.time() - end)
@@ -238,14 +243,33 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
 
             optimizer.zero_grad()
 
-            pl = model.forward_normal_for_pl(input[0])
+            output_text = model.forward_normal_for_pl(input[0])
             out = model.forward_aug_with_prompts(input[1].float().cuda())
 
-            pseudo_label = F.softmax(pl, dim=-1)  # / 0.04
-            pseudo_label = pseudo_label.argmax(dim=1, keepdim=True)
-            pseudo_label = pseudo_label.flatten().cuda()
+            pseudo_label_text = F.softmax(output_text, dim=-1)  # / 0.04
+            pseudo_label_text = pseudo_label_text.argmax(dim=1, keepdim=True)
+            pseudo_label_text = pseudo_label.flatten().cuda()
+            pl_text_acc.update((pseudo_label_text == batch["label"]).sum().item() / len(batch["label"]), len(batch["label"]))
 
-            loss = criteria(out.squeeze(), pseudo_label)
+            if not args.text_only:
+                # Get Pseudo Label from Zero-Shot
+                output_zs = model.forward_pl_zeroshot(input[0])
+                pseudo_label_zero_shot = F.softmax(output_zs, dim=-1).argmax(dim=1, keepdim=True)
+                pseudo_label_zero_shot = pseudo_label_text.flatten().cuda()
+                pl_zs_acc.update((pseudo_label_zero_shot == batch["label"]).sum().item() / len(batch["label"]), len(batch["label"]))
+
+                # BWS Computation: Alpha = softmax(concat(pl_zs,pl_text))
+                alpha = torch.cat([torch.max(F.softmax(output_zs),dim=1)[0].unsqueeze(1),torch.max(F.softmax(output_text),dim=1)[0].unsqueeze(1)], dim=-1)
+                alpha = F.softmax(alpha, dim=-1)
+
+                # New Psuedo Label
+                pl_new = (output_zs*alpha[:, 0].unsqueeze(1) +  output_text*alpha[:, 1].unsqueeze(1))
+                pl_new = torch.flatten(F.softmax(pl_new, dim=-1).argmax(dim=1, keepdim=True))
+
+                #Change later
+                pseudo_label_text = pl_new
+
+            loss = criteria(out.squeeze(), pseudo_label_text)
             if i % args.print_freq == 0:
                 print(
                     "epoch [{0}/{1}][{2}/{3}]\t"
@@ -272,6 +296,11 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
         print(f'TOP-1 Accuracy: {val_acc}')
         all_acc.append(val_acc)
 
+        ps_text_acc=pl_text_acc.avg
+        ps_za_acc=pl_zs_acc.avg
+        print(f'Pseudo Label Text Accuracy: {pl_text_acc.avg}')
+        print(f'Pseudo Label Zero Shot Accuracy: {pl_zs_acc.avg}')
+
         best_test_acc=None
         if val_acc>best_acc:
             best_val_acc="Yes"
@@ -296,7 +325,7 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
             #     os.path.join(args.output_dir, "model_best.pth"))
 
 
-        df_to_append.append([epoch, epoch_loss, val_acc, best_test_acc, best_val_acc])
+        df_to_append.append([epoch, ps_text_acc, ps_zs_acc, epoch_loss, val_acc, best_test_acc, best_val_acc])
     df = pd.DataFrame(df_to_append, columns=columns)    
     csv_path = os.path.join(args.output_dir, "training_metrics.csv")
     df.to_csv(csv_path, index=False)

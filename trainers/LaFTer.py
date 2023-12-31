@@ -179,6 +179,12 @@ class LaFTerUFT(nn.Module):
             pseudo_label = img_features @ self.text_features
         return pseudo_label
 
+    def forward_pl_zeroshot(self, x):
+        with torch.no_grad():
+            img_features = self.image_features(x)
+            pseudo_label = img_features @ self.text_features.float()
+        return pseudo_label
+
     def forward_aug_with_prompts(self, x2):
         '''
         :param x1: the clean image (without transforms, for pseudo labels, for teacher)

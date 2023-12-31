@@ -273,10 +273,11 @@ def zero_shot(model, loader, model_path=None):
 
     #Loading Model
     if model_path:
-        pretrained_model = torch.load(model_path, map_location=model.device)
-        state_dict = pretrained_model["state_dict"]
-        model.adapter.load_state_dict(state_dict)
-        model.prompt_embeddings=pretrained_model['prompt_emb']
+        model.load_state_dict(torch.load(model_path))
+        # pretrained_model = torch.load(model_path, map_location=model.device)
+        # state_dict = pretrained_model["state_dict"]
+        # model.adapter.load_state_dict(state_dict)
+        # model.prompt_embeddings=pretrained_model['prompt_emb']
 
     model.eval()
     with torch.no_grad():
