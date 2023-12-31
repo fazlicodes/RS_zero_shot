@@ -249,14 +249,15 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
             pseudo_label_text = F.softmax(output_text, dim=-1)  # / 0.04
             pseudo_label_text = pseudo_label_text.argmax(dim=1, keepdim=True)
             pseudo_label_text = pseudo_label_text.flatten().cuda()
-            pl_text_acc.update((pseudo_label_text == batch["label"]).sum().item() / len(batch["label"]), len(batch["label"]))
+            pl_text_acc.update((pseudo_label_text == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
+            # breakpoint()
 
             if not args.text_only:
                 # Get Pseudo Label from Zero-Shot
                 output_zs = model.forward_pl_zeroshot(input[0])
                 pseudo_label_zero_shot = F.softmax(output_zs, dim=-1).argmax(dim=1, keepdim=True)
                 pseudo_label_zero_shot = pseudo_label_zero_shot.flatten().cuda()
-                pl_zs_acc.update((pseudo_label_zero_shot == batch["label"]).sum().item() / len(batch["label"]), len(batch["label"]))
+                pl_zs_acc.update((pseudo_label_zero_shot == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
 
                 # BWS Computation: Alpha = softmax(concat(pl_zs,pl_text))
                 alpha = torch.cat([torch.max(F.softmax(output_zs),dim=1)[0].unsqueeze(1),torch.max(F.softmax(output_text),dim=1)[0].unsqueeze(1)], dim=-1)
@@ -297,7 +298,7 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
         all_acc.append(val_acc)
 
         ps_text_acc=pl_text_acc.avg
-        ps_za_acc=pl_zs_acc.avg
+        ps_zs_acc=pl_zs_acc.avg
         print(f'Pseudo Label Text Accuracy: {pl_text_acc.avg}')
         print(f'Pseudo Label Zero Shot Accuracy: {pl_zs_acc.avg}')
 
