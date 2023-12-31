@@ -248,14 +248,14 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
 
             pseudo_label_text = F.softmax(output_text, dim=-1)  # / 0.04
             pseudo_label_text = pseudo_label_text.argmax(dim=1, keepdim=True)
-            pseudo_label_text = pseudo_label.flatten().cuda()
+            pseudo_label_text = pseudo_label_text.flatten().cuda()
             pl_text_acc.update((pseudo_label_text == batch["label"]).sum().item() / len(batch["label"]), len(batch["label"]))
 
             if not args.text_only:
                 # Get Pseudo Label from Zero-Shot
                 output_zs = model.forward_pl_zeroshot(input[0])
                 pseudo_label_zero_shot = F.softmax(output_zs, dim=-1).argmax(dim=1, keepdim=True)
-                pseudo_label_zero_shot = pseudo_label_text.flatten().cuda()
+                pseudo_label_zero_shot = pseudo_label_zero_shot.flatten().cuda()
                 pl_zs_acc.update((pseudo_label_zero_shot == batch["label"]).sum().item() / len(batch["label"]), len(batch["label"]))
 
                 # BWS Computation: Alpha = softmax(concat(pl_zs,pl_text))
@@ -446,6 +446,7 @@ if __name__ == "__main__":
     parser.add_argument('--epochs', type=int, default=50)
     parser.add_argument('--txt_epochs', type=int, default=1000)
     parser.add_argument('--logfolder', default='logs', type=str)
+    parser.add_argument('--text_only', action="store_true")
     args = parser.parse_args()
     args.mile_stones = None
     
