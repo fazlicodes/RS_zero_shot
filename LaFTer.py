@@ -243,48 +243,66 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
 
             optimizer.zero_grad()
 
-            output_text = model.forward_normal_for_pl(input[0])
+            with torch.no_grad():
+                output_text = model.forward_normal_for_pl(input[0])
             out = model.forward_aug_with_prompts(input[1].float().cuda())
 
             pseudo_label_text = F.softmax(output_text, dim=-1)  # / 0.04
             pseudo_label_text = pseudo_label_text.argmax(dim=1, keepdim=True)
             pseudo_label_text = pseudo_label_text.flatten().cuda()
             pl_text_acc.update((pseudo_label_text == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
+            # print(pl_text_acc.avg)
             # breakpoint()
 
             if not args.text_only:
                 # Get Pseudo Label from Zero-Shot
-                output_zs = model.forward_pl_zeroshot(input[0])
-                pseudo_label_zero_shot = F.softmax(output_zs, dim=-1).argmax(dim=1, keepdim=True)
-                pseudo_label_zero_shot = pseudo_label_zero_shot.flatten().cuda()
-                pl_zs_acc.update((pseudo_label_zero_shot == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
+                with torch.no_grad():
+                    output_zs = model.forward_pl_zeroshot(input[0])
+                    pseudo_label_zero_shot = F.softmax(output_zs, dim=-1).argmax(dim=1, keepdim=True)
+                    pseudo_label_zero_shot = pseudo_label_zero_shot.flatten().cuda()
+                    pl_zs_acc.update((pseudo_label_zero_shot == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
+
+                clip_conf = output_zs.softmax(dim=-1).max(dim=-1).values.mean().item
+
+                # # Choose a value for alpha in the range [0, 1]
+                # alpha = 0.25
+                # # Combine the tensors with the specified alpha value
+                # combined_tensor = alpha * output_zs + (1 - alpha) * output_text
+                # # Average along the new dimension
+                # average_tensor = torch.mean(combined_tensor, dim=1)
+                # # Apply softmax along the appropriate dimension (assuming dim=0)
+                # pseudo_label_text = F.softmax(average_tensor, dim=0)
+                # pseudo_label_text = pseudo_label_text.argmax()
+                # # Ensure pseudo_label_text is 1D or flatten it
+                # if pseudo_label_text.dim() > 0:
+                #     pseudo_label_text = pseudo_label_text.view(-1)
+
                 
-                # Combine the tensors along a new dimension (e.g., concatenate along a new dimension)
-                combined_tensor = torch.stack([output_zs, output_text], dim=2)
-
-                # Average along the new dimension
-                average_tensor = torch.mean(combined_tensor, dim=2)
-                pseudo_label_text = F.softmax(average_tensor, dim=1)
-                pseudo_label_text = pseudo_label_text.argmax(dim=1)
-
-                # Ensure pseudo_label_text is 1D or flatten it
-                if pseudo_label_text.dim() > 1:
-                    pseudo_label_text = pseudo_label_text.view(-1)
-
-                # print(pseudo_label_text.shape)
-                # print(pseudo_label_text.view(-1).shape)
-                # print(out.squeeze().shape)
-                # print(pseudo_label_text.shape)
+                # # Combine the tensors along a new dimension (e.g., concatenate along a new dimension)
+                # combined_tensor = torch.stack([output_zs, output_text], dim=2)
+                # # Average along the new dimension
+                # average_tensor = torch.mean(combined_tensor, dim=2)
+                # pseudo_label_text = F.softmax(average_tensor, dim=1)
+                # pseudo_label_text = pseudo_label_text.argmax(dim=1)
+                # # Ensure pseudo_label_text is 1D or flatten it
+                # if pseudo_label_text.dim() > 1:
+                #     pseudo_label_text = pseudo_label_text.view(-1)
 
 
+                #Fixed Alpha
+                alpha = 0.35
+                # Compute the new pl based on Alpha: pl_new = alpha*out_zero_shot + (1-alpha)*out_text
+                pl_new = (output_zs*alpha +  output_text*(1-alpha))
+                pl_new = torch.flatten(F.softmax(pl_new, dim=-1).argmax(dim=1, keepdim=True))
+                pseudo_label_text = pl_new
+
+ 
                 # # BWS Computation: Alpha = softmax(concat(pl_zs,pl_text))
                 # alpha = torch.cat([torch.max(F.softmax(output_zs),dim=1)[0].unsqueeze(1),torch.max(F.softmax(output_text),dim=1)[0].unsqueeze(1)], dim=-1)
                 # alpha = F.softmax(alpha, dim=-1)
-
                 # # New Psuedo Label
                 # pl_new = (output_zs*alpha[:, 0].unsqueeze(1) +  output_text*alpha[:, 1].unsqueeze(1))
                 # pl_new = torch.flatten(F.softmax(pl_new, dim=-1).argmax(dim=1, keepdim=True))
-
                 # #Change later
                 # pseudo_label_text = pl_new
 
@@ -334,16 +352,6 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
             #Save the whole model
             torch.save(model.state_dict(), os.path.join(args.output_dir, "model_best.pth")) 
 
-            # torch.save(
-            #     {
-            #     "state_dict": model.adapter.state_dict(),
-            #     "prompt_emb":model.prompt_embeddings,
-            #     "epoch":epoch,
-            #     "accuracy":val_acc,
-            #     },
-            #     os.path.join(args.output_dir, "model_best.pth"))
-
-
         df_to_append.append([epoch, ps_text_acc, ps_zs_acc, epoch_loss, val_acc, best_test_acc, best_val_acc])
     df = pd.DataFrame(df_to_append, columns=columns)    
     csv_path = os.path.join(args.output_dir, "training_metrics.csv")
@@ -387,8 +395,8 @@ def main(args):
         train_lafter(args, model,train_loader, val_loader, test_loader=test_loader)
         test_acc = test_prompting(test_loader, model, model_path=os.path.join(args.output_dir,"model_best.pth"))
         print(f'Test accuracy (loading saved model):{test_acc}')
-        val_acc = test_prompting(val_loader, model, model_path=os.path.join(args.output_dir,"model_best.pth"))
-        print(f'Val accuracy (loading saved model):{val_acc}')
+        # val_acc = test_prompting(val_loader, model, model_path=os.path.join(args.output_dir,"model_best.pth"))
+        # print(f'Val accuracy (loading saved model):{val_acc}')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

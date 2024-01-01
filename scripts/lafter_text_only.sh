@@ -6,7 +6,7 @@ CFG=vit_b32
 dset="$1"
 txt_cls=lafter
 nos_epochs=50
-v_encoder="georsclip-${nos_epochs}epochs_text_only"
+v_encoder="clip-${nos_epochs}_epochs_text_only_train_test"
 CUDA_VISIBLE_DEVICES=0 python LaFTer.py \
 --root ${DATA} \
 --trainer ${TRAINER} \
