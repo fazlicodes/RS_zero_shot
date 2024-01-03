@@ -90,7 +90,7 @@ def extend_cfg(cfg):
     cfg.TRAINER.COOP.N_CTX = 16  # number of context vectors
     cfg.TRAINER.COOP.CSC = False  # class-specific context
     cfg.TRAINER.COOP.CTX_INIT = ""  # initialization words
-    cfg.TRAINER.COOP.PREC = "fp16"  # fp16, fp32, amp
+    cfg.TRAINER.COOP.PREC = "fp32"  # fp16, fp32, amp
     cfg.TRAINER.COOP.CLASS_TOKEN_POSITION = "end"  # 'middle' or 'end' or 'front'
 
     cfg.TRAINER.COCOOP = CN()
@@ -214,6 +214,17 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
 
     all_acc = list()
     optimizer, scheduler, criteria = setup_lafter_training_utils(args, model)
+    
+    #Freeze CLIP
+    for param in model.model.parameters():
+        param.requires_grad = False
+    
+    # Print learnable parameters
+    print('<<<<<<<<<<<<<<<<<<<<<<Learnable Parameters>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    for name, param in model.model.named_parameters():
+        if param.requires_grad:
+            print(name)
+
     batch_time = lossmeter()
     data_time = lossmeter()
     best_acc = 0
@@ -226,12 +237,13 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
         model.eval()
         model.adapter.train()
         end = time.time()
-        total_loss = 0.0
+        
 
         pl_text_acc = lossmeter()
         pl_text_acc.reset()
         pl_zs_acc = lossmeter()
         pl_zs_acc.reset()
+        total_loss = lossmeter()
 
         for i, batch in enumerate((tr_loader)):
             data_time.update(time.time() - end)
@@ -251,8 +263,6 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
             pseudo_label_text = pseudo_label_text.argmax(dim=1, keepdim=True)
             pseudo_label_text = pseudo_label_text.flatten().cuda()
             pl_text_acc.update((pseudo_label_text == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
-            # print(pl_text_acc.avg)
-            # breakpoint()
 
             if not args.text_only:
                 # Get Pseudo Label from Zero-Shot
@@ -262,7 +272,7 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
                     pseudo_label_zero_shot = pseudo_label_zero_shot.flatten().cuda()
                     pl_zs_acc.update((pseudo_label_zero_shot == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
 
-                clip_conf = output_zs.softmax(dim=-1).max(dim=-1).values.mean().item
+                # clip_conf = output_zs.softmax(dim=-1).max(dim=-1).values.mean().item
 
                 # # Choose a value for alpha in the range [0, 1]
                 # alpha = 0.25
@@ -289,24 +299,26 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
                 #     pseudo_label_text = pseudo_label_text.view(-1)
 
 
-                #Fixed Alpha
-                alpha = 0.35
-                # Compute the new pl based on Alpha: pl_new = alpha*out_zero_shot + (1-alpha)*out_text
-                pl_new = (output_zs*alpha +  output_text*(1-alpha))
-                pl_new = torch.flatten(F.softmax(pl_new, dim=-1).argmax(dim=1, keepdim=True))
-                pseudo_label_text = pl_new
-
- 
-                # # BWS Computation: Alpha = softmax(concat(pl_zs,pl_text))
-                # alpha = torch.cat([torch.max(F.softmax(output_zs),dim=1)[0].unsqueeze(1),torch.max(F.softmax(output_text),dim=1)[0].unsqueeze(1)], dim=-1)
-                # alpha = F.softmax(alpha, dim=-1)
-                # # New Psuedo Label
-                # pl_new = (output_zs*alpha[:, 0].unsqueeze(1) +  output_text*alpha[:, 1].unsqueeze(1))
+                # #Fixed Alpha
+                # alpha = 0.2
+                # # Compute the new pl based on Alpha: pl_new = alpha*out_zero_shot + (1-alpha)*out_text
+                # pl_new = (output_zs*alpha +  output_text*(1-alpha))
                 # pl_new = torch.flatten(F.softmax(pl_new, dim=-1).argmax(dim=1, keepdim=True))
-                # #Change later
                 # pseudo_label_text = pl_new
 
+ 
+                # BWS Computation: Alpha = softmax(concat(pl_zs,pl_text))
+                alpha = torch.cat([torch.max(F.softmax(output_zs),dim=1)[0].unsqueeze(1),torch.max(F.softmax(output_text),dim=1)[0].unsqueeze(1)], dim=-1)
+                alpha = F.softmax(alpha, dim=-1)
+                # New Psuedo Label
+                pl_new = (output_zs*alpha[:, 0].unsqueeze(1) +  output_text*alpha[:, 1].unsqueeze(1))
+                pl_new = torch.flatten(F.softmax(pl_new, dim=-1).argmax(dim=1, keepdim=True))
+                #Change later
+                pseudo_label_text = pl_new
+
             loss = criteria(out.squeeze(), pseudo_label_text)
+            total_loss.update(loss.item(),len(tr_loader))
+
             if i % args.print_freq == 0:
                 print(
                     "epoch [{0}/{1}][{2}/{3}]\t"
@@ -324,9 +336,8 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
             optimizer.step()
         scheduler.step()
         
-        # Compute and save the epoch loss
-        epoch_loss = total_loss / len(tr_loader)
-        print(f'Epoch Loss: {epoch_loss}')
+        
+        print(f'Epoch Loss: {total_loss.avg}')
 
         print(f'Evaluation: {epoch}')
         val_acc = test_prompting(val_loader, model)
@@ -335,6 +346,7 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
 
         ps_text_acc=pl_text_acc.avg
         ps_zs_acc=pl_zs_acc.avg
+
         print(f'Pseudo Label Text Accuracy: {pl_text_acc.avg}')
         print(f'Pseudo Label Zero Shot Accuracy: {pl_zs_acc.avg}')
 
@@ -352,7 +364,7 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
             #Save the whole model
             torch.save(model.state_dict(), os.path.join(args.output_dir, "model_best.pth")) 
 
-        df_to_append.append([epoch, ps_text_acc, ps_zs_acc, epoch_loss, val_acc, best_test_acc, best_val_acc])
+        df_to_append.append([epoch, ps_text_acc, ps_zs_acc, total_loss.avg, val_acc, best_test_acc, best_val_acc])
     df = pd.DataFrame(df_to_append, columns=columns)    
     csv_path = os.path.join(args.output_dir, "training_metrics.csv")
     df.to_csv(csv_path, index=False)

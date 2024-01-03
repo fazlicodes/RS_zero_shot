@@ -8,8 +8,8 @@ from clip.simple_tokenizer import SimpleTokenizer as _Tokenizer
 from clip.clip import tokenize
 _tokenizer = _Tokenizer()
 
-import sys
-sys.path.append("/l/users/sanoojan.baliah/Felix/LaFTer")
+# import sys
+# sys.path.append("/l/users/sanoojan.baliah/Felix/LaFTer")
 from utils.model_utils import *
 from utils.utils import *
 _tokenizer = _Tokenizer()
@@ -22,7 +22,7 @@ def load_clip_to_cpu(cfg):
     url = clip._MODELS[backbone_name]
     model_path = clip._download(url, root='all_weights')
     # model_path="all_weights/RemoteCLIP-ViT-B-32.pt"
-    # model_path ="all_weights/RS5M_ViT-B-32.pt"
+    # model_path ="all_weights/RS5M_ViT-B-32.pt"1
     print(model_path)
 
     try:
@@ -72,6 +72,7 @@ class LaFTerUFT(nn.Module):
         nn.init.uniform_(self.prompt_embeddings.data, -val, val)
         self.txt_features_for_text_cls, self.labels_for_text_cls = self.txt_features_for_text_cls()
         self.text_features = self.txt_features()
+        
     def train_txt_clas(self, criteria):
         noise_std = 0.1
         noise = torch.randn(self.txt_features_for_text_cls.shape) * noise_std
@@ -255,6 +256,10 @@ class LaFTer(TrainerX):
         if device_count > 1:
             print(f"Multiple GPUs detected (n_gpus={device_count}), use all of them!")
             self.model = nn.DataParallel(self.model)
+
+        #  freeze clip
+        for param in self.model.model.parameters():
+            param.requires_grad = False
 
     def build_data_loader(self):
         """Create essential data-related attributes.
