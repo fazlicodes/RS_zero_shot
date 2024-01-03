@@ -245,6 +245,10 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
         pl_zs_acc.reset()
         total_loss = lossmeter()
 
+        print("-------------------------------------")
+        print(args.bws)
+        print("-------------------------------------")
+
         for i, batch in enumerate((tr_loader)):
             data_time.update(time.time() - end)
             batch_time.update(time.time() - end)
@@ -274,9 +278,9 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
 
                 # clip_conf = output_zs.softmax(dim=-1).max(dim=-1).values.mean().item
 
-                if args.bws=="fixed_alpha":
+                if "fixed_alpha" in args.bws:
                     # Choose a value for alpha in the range [0, 1]
-                    alpha = args.alpha_rate
+                    alpha = args.bws.split('_')[-1]
                     combined_tensor = alpha * output_zs + (1 - alpha) * output_text
                     average_tensor = torch.mean(combined_tensor, dim=1)
                     pseudo_label_text = F.softmax(average_tensor, dim=0)
@@ -482,8 +486,7 @@ if __name__ == "__main__":
     parser.add_argument('--txt_epochs', type=int, default=1000)
     parser.add_argument('--logfolder', default='logs', type=str)
     parser.add_argument('--text_only', action="store_true")
-    parser.add_argument('--bws', action="store_true")
-    parser.add_argument('--alpha_rate', type=float, action="store_true")
+    parser.add_argument('--bws', type=str, default="None", choices=['conf_alpha','fixed_alpha_0.25', 'avg'])
     args = parser.parse_args()
     args.mile_stones = None
     

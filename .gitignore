@@ -3,6 +3,7 @@ all_weights/
 .vscode/
 Dassl.pytorch/
 output/
+output_2/
 scripts/.*
 .nfs*
 

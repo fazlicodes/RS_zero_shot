@@ -23,7 +23,9 @@ def load_clip_to_cpu(cfg):
     model_path = clip._download(url, root='all_weights')
     # model_path="all_weights/RemoteCLIP-ViT-B-32.pt"
     # model_path ="all_weights/RS5M_ViT-B-32.pt"1
+    print("_______________________________")
     print(model_path)
+    print("_______________________________")
     try:
         # loading JIT archive
         model = torch.jit.load(model_path, map_location="cpu").eval()
