@@ -274,47 +274,43 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
 
                 # clip_conf = output_zs.softmax(dim=-1).max(dim=-1).values.mean().item
 
-                # # Choose a value for alpha in the range [0, 1]
-                # alpha = 0.25
-                # # Combine the tensors with the specified alpha value
-                # combined_tensor = alpha * output_zs + (1 - alpha) * output_text
-                # # Average along the new dimension
-                # average_tensor = torch.mean(combined_tensor, dim=1)
-                # # Apply softmax along the appropriate dimension (assuming dim=0)
-                # pseudo_label_text = F.softmax(average_tensor, dim=0)
-                # pseudo_label_text = pseudo_label_text.argmax()
-                # # Ensure pseudo_label_text is 1D or flatten it
-                # if pseudo_label_text.dim() > 0:
-                #     pseudo_label_text = pseudo_label_text.view(-1)
+                if args.bws=="fixed_alpha":
+                    # Choose a value for alpha in the range [0, 1]
+                    alpha = args.alpha_rate
+                    combined_tensor = alpha * output_zs + (1 - alpha) * output_text
+                    average_tensor = torch.mean(combined_tensor, dim=1)
+                    pseudo_label_text = F.softmax(average_tensor, dim=0)
+                    pseudo_label_text = pseudo_label_text.argmax()
+                    if pseudo_label_text.dim() > 0:
+                        pseudo_label_text = pseudo_label_text.view(-1)
 
-                
-                # # Combine the tensors along a new dimension (e.g., concatenate along a new dimension)
-                # combined_tensor = torch.stack([output_zs, output_text], dim=2)
-                # # Average along the new dimension
-                # average_tensor = torch.mean(combined_tensor, dim=2)
-                # pseudo_label_text = F.softmax(average_tensor, dim=1)
-                # pseudo_label_text = pseudo_label_text.argmax(dim=1)
-                # # Ensure pseudo_label_text is 1D or flatten it
-                # if pseudo_label_text.dim() > 1:
-                #     pseudo_label_text = pseudo_label_text.view(-1)
+                    # #Fixed Alpha
+                    # alpha = 0.2
+                    # # Compute the new pl based on Alpha: pl_new = alpha*out_zero_shot + (1-alpha)*out_text
+                    # pl_new = (output_zs*alpha +  output_text*(1-alpha))
+                    # pl_new = torch.flatten(F.softmax(pl_new, dim=-1).argmax(dim=1, keepdim=True))
+                    # pseudo_label_text = pl_new
 
+                elif args.bws=="avg":
+                    # Combine the tensors along a new dimension (e.g., concatenate along a new dimension)
+                    combined_tensor = torch.stack([output_zs, output_text], dim=2)
+                    # Average along the new dimension
+                    average_tensor = torch.mean(combined_tensor, dim=2)
+                    pseudo_label_text = F.softmax(average_tensor, dim=1)
+                    pseudo_label_text = pseudo_label_text.argmax(dim=1)
+                    # Ensure pseudo_label_text is 1D or flatten it
+                    if pseudo_label_text.dim() > 1:
+                        pseudo_label_text = pseudo_label_text.view(-1)
 
-                # #Fixed Alpha
-                # alpha = 0.2
-                # # Compute the new pl based on Alpha: pl_new = alpha*out_zero_shot + (1-alpha)*out_text
-                # pl_new = (output_zs*alpha +  output_text*(1-alpha))
-                # pl_new = torch.flatten(F.softmax(pl_new, dim=-1).argmax(dim=1, keepdim=True))
-                # pseudo_label_text = pl_new
-
- 
-                # BWS Computation: Alpha = softmax(concat(pl_zs,pl_text))
-                alpha = torch.cat([torch.max(F.softmax(output_zs),dim=1)[0].unsqueeze(1),torch.max(F.softmax(output_text),dim=1)[0].unsqueeze(1)], dim=-1)
-                alpha = F.softmax(alpha, dim=-1)
-                # New Psuedo Label
-                pl_new = (output_zs*alpha[:, 0].unsqueeze(1) +  output_text*alpha[:, 1].unsqueeze(1))
-                pl_new = torch.flatten(F.softmax(pl_new, dim=-1).argmax(dim=1, keepdim=True))
-                #Change later
-                pseudo_label_text = pl_new
+                elif args.bws=="conf_alpha":
+                    # BWS Computation: Alpha = softmax(concat(pl_zs,pl_text))
+                    alpha = torch.cat([torch.max(F.softmax(output_zs),dim=1)[0].unsqueeze(1),torch.max(F.softmax(output_text),dim=1)[0].unsqueeze(1)], dim=-1)
+                    alpha = F.softmax(alpha, dim=-1)
+                    # New Psuedo Label
+                    pl_new = (output_zs*alpha[:, 0].unsqueeze(1) +  output_text*alpha[:, 1].unsqueeze(1))
+                    pl_new = torch.flatten(F.softmax(pl_new, dim=-1).argmax(dim=1, keepdim=True))
+                    #Change later
+                    pseudo_label_text = pl_new
 
             loss = criteria(out.squeeze(), pseudo_label_text)
             total_loss.update(loss.item(),len(tr_loader))
@@ -486,6 +482,8 @@ if __name__ == "__main__":
     parser.add_argument('--txt_epochs', type=int, default=1000)
     parser.add_argument('--logfolder', default='logs', type=str)
     parser.add_argument('--text_only', action="store_true")
+    parser.add_argument('--bws', action="store_true")
+    parser.add_argument('--alpha_rate', type=float, action="store_true")
     args = parser.parse_args()
     args.mile_stones = None
     

@@ -12,6 +12,8 @@ nos_epochs=50
 # v_encoder="clip-${nos_epochs}epochs_alpha_7.5"
 # v_encoder="clip-${nos_epochs}_epochs_avg_pl"
 v_encoder="clip-${nos_epochs}_epochs_conf_frozen_arch_fp32_test"
+bws="conf_alpha"
+alpha_rate=0.25
 CUDA_VISIBLE_DEVICES=0 python LaFTer.py \
 --root ${DATA} \
 --trainer ${TRAINER} \
@@ -21,4 +23,6 @@ CUDA_VISIBLE_DEVICES=0 python LaFTer.py \
 --lr 0.0005 \
 --epochs ${nos_epochs} \
 --txt_cls ${txt_cls} \
+--bws ${bws} \
+--alpha_rate ${alpha_rate}\
 --batch_size 50
