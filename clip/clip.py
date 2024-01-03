@@ -10,6 +10,8 @@ from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normal
 from tqdm import tqdm
 from .model import build_model
 from .simple_tokenizer import SimpleTokenizer as _Tokenizer
+import wget
+
 
 try:
     from torchvision.transforms import InterpolationMode
@@ -34,8 +36,27 @@ _MODELS = {
     "ViT-B/32": "https://openaipublic.azureedge.net/clip/models/40d365715913c9da98579312b702a82c18be219cc2a73407c4526f58eba950af/ViT-B-32.pt",
     "ViT-B/16": "https://openaipublic.azureedge.net/clip/models/5806e77cd80f8b59890b7e101eabd078d9fb84e6937f9e85e4ecb61988df416f/ViT-B-16.pt",
     "ViT-L/14": "https://openaipublic.azureedge.net/clip/models/b8cca3fd41ae0c99ba7e8951adf17d267cdb84cd88be6f7c2e0eca1737a03836/ViT-L-14.pt",
+    "RemoteCLIP":"https://huggingface.co/chendelong/RemoteCLIP/resolve/main/RemoteCLIP-ViT-B-32.pt",
+    "GeoRSCLIP": "https://huggingface.co/Zilun/GeoRSCLIP/resolve/main/ckpt/RS5M_ViT-B-32.pt"
 }
 
+def download_file(url, destination):
+    try:
+        # Open the URL
+        with urllib.request.urlopen(url) as response:
+            # Open the destination file in binary write mode
+            with open(destination, 'wb') as output_file:
+                with tqdm(total=int(response.info().get("Content-Length")), ncols=80, unit='iB', unit_scale=True, unit_divisor=1024) as loop:
+                    # Read the data in chunks and write to the destination file
+                    while True:
+                        buffer = response.read(8192)  # 8 KB chunks
+                        if not buffer:
+                            break
+                        output_file.write(buffer)
+                        loop.update(len(buffer))
+    except Exception as e:
+        print(f"Error downloading file: {e}")
+    
 
 def _download(url: str, root: str):
     os.makedirs(root, exist_ok=True)
@@ -46,6 +67,14 @@ def _download(url: str, root: str):
 
     if os.path.exists(download_target) and not os.path.isfile(download_target):
         raise RuntimeError(f"{download_target} exists and is not a regular file")
+
+    if "GeoRSCLIP" in url or "RemoteCLIP" in url:
+        if os.path.isfile(download_target):
+            return download_target
+        else:
+            download_file(url, download_target)
+            return download_target
+
 
     if os.path.isfile(download_target):
         if hashlib.sha256(open(download_target, "rb").read()).hexdigest() == expected_sha256:

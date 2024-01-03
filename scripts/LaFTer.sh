@@ -2,7 +2,7 @@
 # custom config
 DATA=data
 TRAINER=LaFTer
-CFG=vit_b32
+CFG=GeoRSCLIP
 dset="$1"
 txt_cls=lafter
 nos_epochs=50
@@ -11,8 +11,7 @@ nos_epochs=50
 # v_encoder="clip-${nos_epochs}-avg_pl"
 # v_encoder="clip-${nos_epochs}epochs_alpha_7.5"
 # v_encoder="clip-${nos_epochs}_epochs_avg_pl"
-v_encoder="clip-${nos_epochs}_epochs_conf_frozen_arch_fp32"
-
+v_encoder="clip-${nos_epochs}_epochs_conf_frozen_arch_fp32_test"
 CUDA_VISIBLE_DEVICES=0 python LaFTer.py \
 --root ${DATA} \
 --trainer ${TRAINER} \
