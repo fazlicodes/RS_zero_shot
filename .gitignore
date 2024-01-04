@@ -6,6 +6,7 @@ output/
 output_2/
 scripts/.*
 .nfs*
+configs/trainers/text_cls/*
 
 embeddings/
 
