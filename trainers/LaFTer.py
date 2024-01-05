@@ -83,6 +83,15 @@ class LaFTerUFT(nn.Module):
         loss = criteria(feas, txt_label)
         return loss
 
+    def generate_pl_text(self, dataloader):
+        for i, batch in enumerate(dataloader):
+            input = batch["img"]
+            input = torch.stack(input)  # two views from dataloader
+            input = input.to(self.device)
+            with torch.no_grad():
+                output_zs = self.forward_pl_zeroshot(input[0])
+                pseudo_label_zero_shot = F.softmax(output_zs, dim=-1).argmax(dim=1, keepdim=True)
+
     def txt_features_for_text_cls(self):
 
         if self.txt_cls== 'cls_only':
