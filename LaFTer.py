@@ -215,6 +215,9 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
     all_acc = list()
     optimizer, scheduler, criteria = setup_lafter_training_utils(args, model)
     
+    for param in model.image_features_frozen.parameters(): 
+        param.requires_grad = False
+
     if args.ln_frozen:
         print("------LN Frozen------")
         #Freeze CLIP

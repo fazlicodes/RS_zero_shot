@@ -47,6 +47,7 @@ class LaFTerUFT(nn.Module):
     def __init__(self, model, classes, templates, ds_templates=None, device='cuda', log=None, dataset_name=None, txt_cls=None, cfg=None):
         super(LaFTerUFT, self).__init__()
         self.adapter_pl = None
+        self.image_features_frozen = None
         self.device = device
         self.cfg = cfg
         self.dataset_templates = ds_templates
@@ -84,6 +85,9 @@ class LaFTerUFT(nn.Module):
         return loss
 
     def generate_pl_text(self, dataloader):
+        '''NOT BEING USED'''
+        pl = []
+        acc = 0
         for i, batch in enumerate(dataloader):
             input = batch["img"]
             input = torch.stack(input)  # two views from dataloader
@@ -91,6 +95,12 @@ class LaFTerUFT(nn.Module):
             with torch.no_grad():
                 output_zs = self.forward_pl_zeroshot(input[0])
                 pseudo_label_zero_shot = F.softmax(output_zs, dim=-1).argmax(dim=1, keepdim=True)
+                pl.append(pseudo_label_zero_shot)
+                acc += (pseudo_label_zero_shot == batch["label"].cuda()).float().mean()
+
+        self.zeroshot_pl = torch.cat(pl, dim=0)
+        acc = acc / len(dataloader)
+        print(f"zeroshot acc: {acc}")
 
     def txt_features_for_text_cls(self):
 
@@ -192,7 +202,7 @@ class LaFTerUFT(nn.Module):
 
     def forward_pl_zeroshot(self, x):
         with torch.no_grad():
-            img_features = self.image_features(x)
+            img_features = self.image_features_frozen_pl(x)
             pseudo_label = img_features @ self.text_features.float()
         return pseudo_label
 
@@ -210,6 +220,14 @@ class LaFTerUFT(nn.Module):
     def txt_cls_init(self):
         import copy
         self.adapter_pl = copy.deepcopy(self.adapter)
+        self.image_features_frozen = copy.deepcopy(self.model.visual)
+    
+    def image_features_frozen_pl(self, images):
+        with torch.no_grad():
+            image_features = self.image_features_frozen(images.type(self.model.dtype))
+            image_features /= image_features.norm(dim=-1, keepdim=True)
+            return image_features
+
     def forward_normal_for_pl(self, x1):
         '''
         :param x1: the clean image (without transforms, for pseudo labels, for teacher)
@@ -217,7 +235,7 @@ class LaFTerUFT(nn.Module):
         :return: features adapter (cls head), pseudo-labels
         '''
         with torch.no_grad():
-            img_features_1 = self.image_features(x1)
+            img_features_1 = self.image_features_frozen_pl(x1)
             pseudo_label = self.adapter_pl(img_features_1.float()).detach()
         return pseudo_label
 
