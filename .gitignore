@@ -8,7 +8,7 @@ output_3/
 scripts/.*
 .nfs*
 configs/trainers/text_cls/*
-
+output_clip_unshared/*
 embeddings/
 
 # Python specific

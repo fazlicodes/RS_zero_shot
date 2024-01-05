@@ -19,3 +19,4 @@ CUDA_VISIBLE_DEVICES=0 python LaFTer.py \
 --bws ${bws} \
 --ln_frozen \
 --batch_size 50
+echo "output_3/${TRAINER}/${CFG}/"${dset}"_"${nos_epochs}"/"${bws}_LN_Frozen""
