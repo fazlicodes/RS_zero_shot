@@ -12,9 +12,10 @@ CUDA_VISIBLE_DEVICES=0 python LaFTer.py \
 --trainer ${TRAINER} \
 --dataset-config-file configs/datasets/"${dset}".yaml \
 --config-file configs/trainers/text_cls/${CFG}.yaml \
---output-dir output_2/${TRAINER}/${CFG}/"${dset}"_"${nos_epochs}"/"${bws}" \
+--output-dir output_3/${TRAINER}/${CFG}/"${dset}"_"${nos_epochs}"/"${bws}_LN_Frozen" \
 --lr 0.0005 \
 --epochs ${nos_epochs} \
 --txt_cls ${txt_cls} \
 --bws ${bws} \
+--ln_frozen \
 --batch_size 50

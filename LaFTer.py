@@ -215,9 +215,11 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
     all_acc = list()
     optimizer, scheduler, criteria = setup_lafter_training_utils(args, model)
     
-    #Freeze CLIP
-    for param in model.model.parameters():
-        param.requires_grad = False
+    if args.ln_frozen:
+        print("------LN Frozen------")
+        #Freeze CLIP
+        for param in model.model.parameters():
+            param.requires_grad = False
     
     # Print learnable parameters
     print('<<<<<<<<<<<<<<<<<<<<<<Learnable Parameters>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
@@ -487,6 +489,7 @@ if __name__ == "__main__":
     parser.add_argument('--logfolder', default='logs', type=str)
     parser.add_argument('--text_only', action="store_true")
     parser.add_argument('--bws', type=str, default="None", choices=['conf_alpha','fixed_alpha_0.25', 'avg'])
+    parser.add_argument('--ln_frozen', action="store_true")
     args = parser.parse_args()
     args.mile_stones = None
     
