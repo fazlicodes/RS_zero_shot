@@ -8,6 +8,9 @@ output_3/
 scripts/.*
 .nfs*
 configs/trainers/text_cls/*
+output_4/
+output_clip_unshared/
+output_text_desc_emb/
 
 embeddings/
 

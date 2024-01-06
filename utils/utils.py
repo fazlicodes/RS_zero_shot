@@ -30,7 +30,12 @@ def setup_text_training_utils(args, model):
             value.requires_grad = True
         else:
             value.requires_grad = False
-
+    
+    if args.train_text_ln:
+        for key, value in model.named_parameters():
+            if 'ln' in key:
+                value.requires_grad=True
+                
     print('------------------ Learnable Parameters ------------------')
     for key, value in model.named_parameters():
         if value.requires_grad:
@@ -91,6 +96,12 @@ def setup_lafter_training_utils(args, model):
                 value.requires_grad = True
             else:
                 value.requires_grad = False
+    
+    if args.ln_frozen:
+        print("------LN Frozen------")
+        #Freeze CLIP
+        for param in model.model.parameters():
+            param.requires_grad = False
 
     print('------------------ Learnable Parameters ------------------')
     for key, value in model.named_parameters():

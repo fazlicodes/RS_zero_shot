@@ -73,6 +73,7 @@ class LaFTerUFT(nn.Module):
         nn.init.uniform_(self.prompt_embeddings.data, -val, val)
         self.txt_features_for_text_cls, self.labels_for_text_cls = self.txt_features_for_text_cls()
         self.text_features = self.txt_features()
+        self.class_desc_emb = self.gen_emb()
         
     def train_txt_clas(self, criteria):
         noise_std = 0.1
@@ -146,6 +147,35 @@ class LaFTerUFT(nn.Module):
 
         else:
             return None, None
+        
+    def gen_emb(self):
+
+        # Map unique string values to numerical indices
+        unique_groups, group_indices = torch.unique(self.labels_for_text_cls, return_inverse=True)
+        
+        # Get the total number of unique groups
+        total_groups = len(unique_groups)
+
+        # Ensure the number of specified groups is valid
+        if len(self.classes) > total_groups:
+            raise ValueError("The specified number of groups is greater than the total number of unique groups.")
+
+        # Split the indices into the specified number of groups
+        group_indices_split = torch.chunk(torch.arange(total_groups), len(self.classes))
+
+        # Create a list to store tensors for each group
+        group_list = []
+
+        # Iterate over each group and create tensors for the "other" tensor
+        for indices in group_indices_split:
+            subset_other_tensor = self.txt_features_for_text_cls[group_indices == indices[0]]  # Assuming group indices are consistent
+            group_list.append(subset_other_tensor)
+
+        # Stack the tensors to create a tensor of shape (num_groups, group_dim, emb_dim)
+        other_tensor_split = torch.stack(group_list).mean(axis=1)
+
+        return other_tensor_split.T
+
 
     def txt_features(self):
         with torch.no_grad():
@@ -184,7 +214,7 @@ class LaFTerUFT(nn.Module):
     def forward_pl_zeroshot(self, x):
         with torch.no_grad():
             img_features = self.image_features(x)
-            pseudo_label = img_features @ self.text_features.float()
+            pseudo_label = img_features @ self.class_desc_emb
         return pseudo_label
 
     def forward_aug_with_prompts(self, x2):

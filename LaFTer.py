@@ -215,11 +215,11 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
     all_acc = list()
     optimizer, scheduler, criteria = setup_lafter_training_utils(args, model)
     
-    if args.ln_frozen:
-        print("------LN Frozen------")
-        #Freeze CLIP
-        for param in model.model.parameters():
-            param.requires_grad = False
+    # if args.ln_frozen:
+    #     print("------LN Frozen------")
+    #     #Freeze CLIP
+    #     for param in model.model.parameters():
+    #         param.requires_grad = False
     
     # Print learnable parameters
     print('<<<<<<<<<<<<<<<<<<<<<<Learnable Parameters>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
@@ -365,6 +365,8 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
 
             #Save the whole model
             torch.save(model.state_dict(), os.path.join(args.output_dir, "model_best.pth")) 
+        
+        print("Output dir: ",args.output_dir)
 
         df_to_append.append([epoch, ps_text_acc, ps_zs_acc, total_loss.avg, val_acc, best_test_acc, best_val_acc])
     df = pd.DataFrame(df_to_append, columns=columns)    
@@ -488,8 +490,9 @@ if __name__ == "__main__":
     parser.add_argument('--txt_epochs', type=int, default=1000)
     parser.add_argument('--logfolder', default='logs', type=str)
     parser.add_argument('--text_only', action="store_true")
-    parser.add_argument('--bws', type=str, default="None", choices=['conf_alpha','fixed_alpha_0.25', 'avg'])
+    parser.add_argument('--bws', type=str, default="None", choices=['None','conf_alpha','fixed_alpha_0.25', 'avg'])
     parser.add_argument('--ln_frozen', action="store_true")
+    parser.add_argument('--train_text_ln', action="store_true")
     args = parser.parse_args()
     args.mile_stones = None
     
