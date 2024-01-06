@@ -265,10 +265,10 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
                 output_text = model.forward_normal_for_pl(input[0])
             out = model.forward_aug_with_prompts(input[1].float().cuda())
 
-            pseudo_label_text = F.softmax(output_text, dim=-1)  # / 0.04
-            pseudo_label_text = pseudo_label_text.argmax(dim=1, keepdim=True)
-            pseudo_label_text = pseudo_label_text.flatten().cuda()
-            pl_text_acc.update((pseudo_label_text == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
+            pseudo_label = F.softmax(output_text, dim=-1)  # / 0.04
+            pseudo_label = pseudo_label.argmax(dim=1, keepdim=True)
+            pseudo_label = pseudo_label.flatten().cuda()
+            pl_text_acc.update((pseudo_label == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
 
             if not args.text_only:
                 # Get Pseudo Label from Zero-Shot
@@ -284,11 +284,11 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
                     # Choose a value for alpha in the range [0, 1]
                     alpha = args.bws.split('_')[-1]
                     combined_tensor = alpha * output_zs + (1 - alpha) * output_text
-                    average_tensor = torch.mean(combined_tensor, dim=1)
-                    pseudo_label_text = F.softmax(average_tensor, dim=0)
-                    pseudo_label_text = pseudo_label_text.argmax()
-                    if pseudo_label_text.dim() > 0:
-                        pseudo_label_text = pseudo_label_text.view(-1)
+                    pseudo_label_pre_softmax = torch.mean(combined_tensor, dim=1)
+                    pseudo_label_comb = F.softmax(pseudo_label_pre_softmax, dim=0)
+                    pseudo_label_comb = pseudo_label_comb.argmax()
+                    if pseudo_label_comb.dim() > 0:
+                        pseudo_label = pseudo_label_comb.view(-1)
 
                     # #Fixed Alpha
                     # alpha = 0.2
@@ -301,24 +301,28 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
                     # Combine the tensors along a new dimension (e.g., concatenate along a new dimension)
                     combined_tensor = torch.stack([output_zs, output_text], dim=2)
                     # Average along the new dimension
-                    average_tensor = torch.mean(combined_tensor, dim=2)
-                    pseudo_label_text = F.softmax(average_tensor, dim=1)
-                    pseudo_label_text = pseudo_label_text.argmax(dim=1)
+                    pseudo_label_pre_softmax = torch.mean(combined_tensor, dim=2)
+                    pseudo_label_comb = F.softmax(pseudo_label_pre_softmax, dim=1)
+                    pseudo_label_comb = pseudo_label_comb.argmax(dim=1)
                     # Ensure pseudo_label_text is 1D or flatten it
-                    if pseudo_label_text.dim() > 1:
-                        pseudo_label_text = pseudo_label_text.view(-1)
+                    if pseudo_label_comb.dim() > 1:
+                        pseudo_label = pseudo_label_comb.view(-1)
 
                 elif args.bws=="conf_alpha":
                     # BWS Computation: Alpha = softmax(concat(pl_zs,pl_text))
                     alpha = torch.cat([torch.max(F.softmax(output_zs),dim=1)[0].unsqueeze(1),torch.max(F.softmax(output_text),dim=1)[0].unsqueeze(1)], dim=-1)
                     alpha = F.softmax(alpha, dim=-1)
                     # New Psuedo Label
-                    pl_new = (output_zs*alpha[:, 0].unsqueeze(1) +  output_text*alpha[:, 1].unsqueeze(1))
-                    pl_new = torch.flatten(F.softmax(pl_new, dim=-1).argmax(dim=1, keepdim=True))
+                    pseudo_label_pre_softmax = (output_zs*alpha[:, 0].unsqueeze(1) +  output_text*alpha[:, 1].unsqueeze(1))
+                    pseudo_label_comb = torch.flatten(F.softmax(pseudo_label_pre_softmax, dim=-1).argmax(dim=1, keepdim=True))
                     #Change later
-                    pseudo_label_text = pl_new
+                    pseudo_label = pseudo_label_comb
 
-            loss = criteria(out.squeeze(), pseudo_label_text)
+            
+            if args.loss_fn=="crossentropy":
+                loss = criteria(out.squeeze(), pseudo_label)
+            elif args.loss_fn=="distill":
+                loss = criteria(out.squeeze(), pseudo_label_pre_softmax)    
             total_loss.update(loss.item(),len(tr_loader))
 
             if i % args.print_freq == 0:
@@ -493,6 +497,7 @@ if __name__ == "__main__":
     parser.add_argument('--bws', type=str, default="None", choices=['None','conf_alpha','fixed_alpha_0.25', 'avg'])
     parser.add_argument('--ln_frozen', action="store_true")
     parser.add_argument('--train_text_ln', action="store_true")
+    parser.add_argument('--loss_fn', default='crossentropy')
     args = parser.parse_args()
     args.mile_stones = None
     

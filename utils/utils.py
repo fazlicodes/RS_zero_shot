@@ -35,7 +35,7 @@ def setup_text_training_utils(args, model):
         for key, value in model.named_parameters():
             if 'ln' in key:
                 value.requires_grad=True
-                
+
     print('------------------ Learnable Parameters ------------------')
     for key, value in model.named_parameters():
         if value.requires_grad:
@@ -121,7 +121,11 @@ def setup_lafter_training_utils(args, model):
 
     optimizer = optim.AdamW(optimizer_grouped_parameters, lr=args.lr, betas=(0.9, 0.999))
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, args.mile_stones, 0.60)
-    criteria = LabelSmoothingCrossEntropy()
+
+    if args.loss_fn=="crossentropy":
+        criteria = LabelSmoothingCrossEntropy()
+    elif args.loss_fn=="distill":
+        criteria = DistillationLoss()
     return optimizer, scheduler, criteria
 
 def test_prompting(teloader, model,model_path=None):
@@ -245,6 +249,31 @@ class DINOLoss(nn.Module):
             n_loss_terms += 1
         total_loss /= n_loss_terms
         return total_loss
+
+class DistillationLoss(nn.Module):
+    def __init__(self, temperature=1.0):
+        super(DistillationLoss, self).__init__()
+        self.temperature = temperature
+
+    def forward(self, student_logits, teacher_logits):
+        """
+        Calculate the distillation loss between student and teacher logits.
+
+        Args:
+            student_logits (torch.Tensor): Logits from the student model.
+            teacher_logits (torch.Tensor): Logits from the teacher model.
+
+        Returns:
+            torch.Tensor: Distillation loss.
+        """
+        # Apply softmax to both student and teacher logits
+        student_probs = F.softmax(student_logits / self.temperature, dim=1)
+        teacher_probs = F.softmax(teacher_logits / self.temperature, dim=1)
+
+        # Calculate the Kullback-Leibler (KL) divergence loss
+        loss = F.kl_div(student_probs.log(), teacher_probs, reduction='batchmean') * (self.temperature ** 2)
+
+        return loss
 
 
 def setup_log_folder(args):
