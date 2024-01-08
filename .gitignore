@@ -2,10 +2,9 @@ data/
 all_weights/
 .vscode/
 Dassl.pytorch/
-output/
-output_2/
-output_3/
+output*/
 scripts/.*
+test*.py
 .nfs*
 configs/trainers/text_cls/*
 
