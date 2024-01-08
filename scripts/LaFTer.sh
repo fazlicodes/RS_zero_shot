@@ -17,5 +17,6 @@ CUDA_VISIBLE_DEVICES=0 python LaFTer.py \
 --epochs ${nos_epochs} \
 --txt_cls ${txt_cls} \
 --bws ${bws} \
---ln_frozen \
---batch_size 50
+--batch_size 50 \
+--text_only
+# --ln_frozen \
