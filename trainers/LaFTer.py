@@ -214,6 +214,7 @@ class LaFTerUFT(nn.Module):
     def forward_pl_zeroshot(self, x):
         with torch.no_grad():
             img_features = self.image_features(x)
+            # pseudo_label = img_features @ self.text_features
             pseudo_label = img_features @ self.class_desc_emb
         return pseudo_label
 
