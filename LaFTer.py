@@ -370,6 +370,7 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
             torch.save(model.state_dict(), os.path.join(args.output_dir, "model_best.pth")) 
 
         df_to_append.append([epoch, ps_text_acc, ps_zs_acc, total_loss.avg, val_acc, best_test_acc, best_val_acc])
+        print("Output dir: ",args.output_dir)
     df = pd.DataFrame(df_to_append, columns=columns)    
     csv_path = os.path.join(args.output_dir, "training_metrics.csv")
     df.to_csv(csv_path, index=False)

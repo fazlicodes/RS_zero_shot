@@ -3,12 +3,11 @@ all_weights/
 .vscode/
 Dassl.pytorch/
 output/
-output_2/
-output_3/
+output*/
 scripts/.*
 .nfs*
 configs/trainers/text_cls/*
-output_clip_unshared/*
+test*.py
 embeddings/
 
 # Python specific
