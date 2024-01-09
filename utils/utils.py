@@ -74,6 +74,49 @@ def setup_text_training_utils(args, model):
     criteria = LabelSmoothingCrossEntropy()
     return optimizer, scheduler, criteria
 
+def setup_ssl_pretraining_utils(args, model, num_batches):
+
+    model = model.cuda()
+    params = list()
+
+    for key, value in model.named_parameters():
+        if 'enc_for_svl' in key or 'projection_for_svl' in key:
+            value.requires_grad = True
+        else:
+            value.requires_grad = False
+    
+
+    print('------------------ Learnable Parameters ------------------')
+    for key, value in model.named_parameters():
+        if value.requires_grad:
+            print("\t{}, {}, {}".format(key, value.numel(), value.shape))
+            params.append((key, value))
+    print('----------------------------------------------------------')
+
+    no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+
+    optimizer_grouped_parameters = [
+        {'params': [p for n, p in params
+                    if not any(nd in n for nd in no_decay)],
+         'weight_decay': 0.01},
+        {'params': [p for n, p in params
+                    if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+    ]
+
+    optimizer = torch.optim.SGD(
+        optimizer_grouped_parameters,
+        args['learning_rate'],
+        momentum=0.9,
+        weight_decay=0.0005)
+    
+    
+    if args['schedule'] == 'cosine':
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, float(args['epochs'])*num_batches)
+
+    criteria = LabelSmoothingCrossEntropy()
+    return optimizer, scheduler, criteria
+
 def setup_lafter_training_utils(args, model):
     model = model.cuda()
     model = model.float()
@@ -305,6 +348,59 @@ class AverageMeter(object):
         fmtstr = '{name} {val' + self.fmt + '} ({avg' + self.fmt + '})'
         return fmtstr.format(**self.__dict__)
 
+
+def nt_xent(x1, x2, args):
+    # assumes that the input data is stacked i.e. 
+    # x1 (B1 C H W) + x2 (B2 C H W) - B1 typically == B2
+    
+    x = torch.cat((x1, x2), 0)
+    x = F.normalize(x, dim=1)
+    x_scores = x @ x.t()
+    x_scale = x_scores / args['temperature']   # scale with temperature
+
+    # (2N-1)-way softmax without the score of i-th entry itself.
+    # Set the diagonals to be large negative values, which become zeros after softmax.
+    x_scale = x_scale - torch.eye(x_scale.size(0)).to(x_scale.device) * 1e5
+    
+    # targets 2N elements.
+    if x1.shape[0] == 1:
+        # last element is the target i.e. all should be the same
+        targets = torch.zeros(x.shape[0], device=x.device).long() 
+        x_scale[0,0] = 1.0 / args['temperature'] 
+    else: 
+        # data is stacked in two halves
+        targets = torch.arange(x.shape[0], device=x.device).long()
+        targets[:x.shape[0]//2] += x.shape[0]//2
+        targets[x.shape[0]//2:] -= x.shape[0]//2
+        
+    return F.cross_entropy(x_scale, targets)
+
+
+def train_ssl(model, args, train_loader, optimizer, scheduler, epoch):
+
+    model.train()
+    loss_meter = AverageMeter(args['train_loss'])
+    train_bar = tqdm(train_loader)
+    for data in train_bar:
+        x = torch.cat(data['img'], 0).to(args['device'])
+        optimizer.zero_grad()
+    
+        b_size = x.shape[0]
+        op = model.forward_svl(x)  
+
+        if args['train_loss'] == 'simclr':            
+            loss = nt_xent(op['emb'][:b_size//2, :], op['emb'][b_size//2:, :], args)
+        # elif args['train_loss'] == 'triplet':
+        #     loss = triplet_loss(op['emb'], args, margin=args['triplet_margin'])
+
+        loss.backward()
+        optimizer.step()
+        scheduler.step()
+
+        loss_meter.update(loss.item(), x.shape[0])
+        train_bar.set_description("Train epoch {}, loss: {:.4f}".format(epoch, loss_meter.avg))
+
+    return loss_meter.avg
 
 def zero_shot(model, loader, model_path=None):
     print('-------------- ZERO SHOT INFERENCE --------------')

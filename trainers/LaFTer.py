@@ -16,6 +16,7 @@ _tokenizer = _Tokenizer()
 from functools import reduce
 from operator import mul
 from utils.data_utils import ds_specific_templates
+from torchvision.models import resnet18, resnet50
 
 def load_clip_to_cpu(cfg):
     backbone_name = cfg.MODEL.BACKBONE.NAME
@@ -41,6 +42,22 @@ def load_clip_to_cpu(cfg):
 
     return model
 
+
+class AdapterMLP(nn.Module):
+    '''
+    MLP Network for low-shot adaptation (trained on top of frozen features)
+    '''
+    def __init__(self,num_classes,input_size,hidden_size):
+        super(AdapterMLP, self).__init__()
+
+        self.mlp = nn.Sequential(
+            nn.Linear(input_size, hidden_size),
+            nn.ReLU(inplace=True),
+            nn.Linear(hidden_size, num_classes)
+        )
+    def forward(self, x):
+        out = self.mlp(x)
+        return out
 
 class LaFTerUFT(nn.Module):
 
@@ -74,7 +91,30 @@ class LaFTerUFT(nn.Module):
         self.txt_features_for_text_cls, self.labels_for_text_cls = self.txt_features_for_text_cls()
         self.text_features = self.txt_features()
         self.class_desc_emb = self.gen_emb()
-        
+        self.build_ssl_encoder(cfg.TRAINER.SVL.ENC_FOR_SVL)
+        self.adapter_for_svl = AdapterMLP(len(classes), 512, 128).to(device)
+
+    def build_ssl_encoder(self, name):
+        if name == "resnet18":
+            self.enc_for_svl = resnet18(pretrained=True)
+        elif name == "resnet50":
+            self.enc_for_svl = resnet50(pretrained=True)
+        elif name == "vit_b32":
+            # depp copy the model.visual
+            import copy
+            self.enc_for_svl = copy.deepcopy(self.model.visual)
+        else:
+            raise ValueError("Invalid encoder name")
+        self.projection_for_svl = nn.Sequential(nn.Linear(self.enc_for_svl.proj.shape[1], 512, bias=False), nn.ReLU(), nn.Linear(512, 128, bias=False))
+
+    def forward_svl(self, x, only_feats=False, context=None):
+        op = {}
+        op['feat'] = self.enc_for_svl(x) 
+        if not only_feats:        
+            op['emb'] = self.projection_for_svl(op['feat'])
+
+        return op  
+      
     def train_txt_clas(self, criteria):
         noise_std = 0.1
         noise = torch.randn(self.txt_features_for_text_cls.shape) * noise_std

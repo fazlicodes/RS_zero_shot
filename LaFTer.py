@@ -1,5 +1,7 @@
 import argparse
 import torch
+import torch.nn.functional as F
+from torch.optim.lr_scheduler import CosineAnnealingLR
 import pandas as pd
 import datetime
 from dassl.utils import setup_logger, set_random_seed, collect_env_info
@@ -86,12 +88,18 @@ def extend_cfg(cfg):
     """
     from yacs.config import CfgNode as CN
 
+    cfg.TRAINER.SVL = CN()
+    cfg.TRAINER.SVL.N_CTX = 16  # number of context vectors
+    cfg.TRAINER.SVL.ENC_FOR_SVL = "vit_b32"  # 'middle' or 'end' or 'front'
+
+
     cfg.TRAINER.COOP = CN()
     cfg.TRAINER.COOP.N_CTX = 16  # number of context vectors
     cfg.TRAINER.COOP.CSC = False  # class-specific context
     cfg.TRAINER.COOP.CTX_INIT = ""  # initialization words
     cfg.TRAINER.COOP.PREC = "fp32"  # fp16, fp32, amp
     cfg.TRAINER.COOP.CLASS_TOKEN_POSITION = "end"  # 'middle' or 'end' or 'front'
+
 
     cfg.TRAINER.COCOOP = CN()
     cfg.TRAINER.COCOOP.N_CTX = 16  # number of context vectors
@@ -124,6 +132,16 @@ def setup_cfg(args):
 
     return cfg
 
+def extend_args_for_svl(args):
+
+    args['burn_in'] = 0
+    args['burn_in_select'] = 0
+    args['pos_type'] = 'augment_self'
+    args['temperature'] = 0.5
+    args['learning_rate_mult'] = 0.03
+    args['learning_rate'] = args['learning_rate_mult']* args['batch_size']/256
+    args['train_loss'] = 'simclr'
+    args['schedule'] = 'cosine'
 
 class lossmeter:
     """Compute and store the average and current value.
@@ -207,10 +225,31 @@ def train_txt_cls(args, model):
         optimizer.step()
     model.txt_cls_init()
 
+def ssl_pretrain(args, model, tr_loader):
+    args_svl = vars(args)
+    extend_args_for_svl(args_svl)
+    optimizer, scheduler, criteria = setup_ssl_pretraining_utils(args_svl, model, len(tr_loader))
+     # if burn in period, freeze the backbone weights for the first few epochs
+    if args_svl['burn_in'] > 0:
+        for param in model.enc_for_svl.parameters():
+            param.requires_grad = False
+
+    # main train loop
+    for epoch in range(1, args_svl['epochs'] + 1):  
+        if args_svl['burn_in'] == epoch:
+            for param in model.enc_for_svl.parameters():
+                param.requires_grad = True
+
+        loss_avg = train_ssl(model, args_svl, tr_loader, optimizer, scheduler, epoch)  
+
+
 def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
 
     # first train text classifier
     train_txt_cls(args, model)
+
+    # ssl-pretraining followed by training the adapter
+    ssl_pretrain(args, model,tr_loader)
 
     all_acc = list()
     optimizer, scheduler, criteria = setup_lafter_training_utils(args, model)
