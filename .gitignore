@@ -6,8 +6,7 @@ output*/
 scripts/.*
 .nfs*
 configs/trainers/text_cls/*
-test*
-
+test*.py
 embeddings/
 
 # Python specific
