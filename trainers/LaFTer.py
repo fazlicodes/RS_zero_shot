@@ -41,6 +41,10 @@ def load_clip_to_cpu(cfg):
 
     return model
 
+def weights_init(m):
+    if isinstance(m, nn.Linear):
+        nn.init.xavier_uniform_(m.weight.data)
+        nn.init.zeros_(m.bias.data)
 
 class LaFTerUFT(nn.Module):
 
@@ -233,8 +237,8 @@ class LaFTerUFT(nn.Module):
     def forward_pl_zeroshot(self, x):
         with torch.no_grad():
             img_features = self.image_features_frozen_pl(x)
-            # pseudo_label = img_features @ self.text_features.float()
-            pseudo_label = img_features @ self.class_desc_emb.float()
+            pseudo_label = img_features @ self.text_features.float()
+            # pseudo_label = img_features @ self.class_desc_emb.float()
         return pseudo_label
 
     def forward_aug_with_prompts(self, x2):
@@ -251,6 +255,7 @@ class LaFTerUFT(nn.Module):
     def txt_cls_init(self):
         import copy
         self.adapter_pl = copy.deepcopy(self.adapter)
+        self.adapter.apply(weights_init)
         self.image_features_frozen = copy.deepcopy(self.model.visual)
     
     def image_features_frozen_pl(self, images):

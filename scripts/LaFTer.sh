@@ -18,7 +18,7 @@ CUDA_VISIBLE_DEVICES=3 python LaFTer.py \
 --txt_cls ${txt_cls} \
 --bws ${bws} \
 --batch_size 50 \
---train_text_ln \
+# --train_text_ln \
 # --text_only 
 # --ln_frozen \
 # echo "output_3/${TRAINER}/${CFG}/"${dset}"_"${nos_epochs}"/"${bws}_LN_Frozen""
