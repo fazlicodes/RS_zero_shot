@@ -44,7 +44,8 @@ def load_clip_to_cpu(cfg):
 def weights_init(m):
     if isinstance(m, nn.Linear):
         nn.init.xavier_uniform_(m.weight.data)
-        nn.init.zeros_(m.bias.data)
+        if m.bias is not None:
+            nn.init.zeros_(m.bias.data)
 
 class LaFTerUFT(nn.Module):
 
