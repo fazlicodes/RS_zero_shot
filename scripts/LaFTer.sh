@@ -2,7 +2,7 @@
 # custom config
 DATA=data
 TRAINER=LaFTer
-CFG=GeoRSCLIP #'GeoRSCLIP' or 'vit_b32' or 'RemoteCLIP' or 'EVA02_CLIP_B_psz16_s8B'
+CFG=vit_b32 #'GeoRSCLIP' or 'vit_b32' or 'RemoteCLIP' or 'EVA02_CLIP_B_psz16_s8B'
 dset="$1"
 txt_cls=lafter
 nos_epochs=50
@@ -17,5 +17,4 @@ CUDA_VISIBLE_DEVICES=0 python LaFTer.py \
 --epochs ${nos_epochs} \
 --txt_cls ${txt_cls} \
 --bws ${bws} \
---ln_frozen \
 --batch_size 50

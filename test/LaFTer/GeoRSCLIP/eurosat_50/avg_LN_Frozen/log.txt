@@ -1,0 +1,355 @@
+***************
+** Arguments **
+***************
+acc_batches: 1
+arch: ViT-B/32
+backbone: 
+batch_size: 50
+bws: avg
+config_file: configs/trainers/text_cls/GeoRSCLIP.yaml
+dataset_config_file: configs/datasets/eurosat.yaml
+device: cuda
+epochs: 50
+eval_only: False
+exp_name: None
+gpt_prompts: False
+head: 
+ln_frozen: True
+load_epoch: None
+logfolder: logs
+lr: 0.0005
+mile_stones: None
+model_dir: 
+no_train: False
+opts: []
+output_dir: test/LaFTer/GeoRSCLIP/eurosat_50/avg_LN_Frozen
+print_freq: 10
+resume: 
+root: data
+scheduler: cosine
+scheduler_epochs: 15
+scheduler_gamma: 0.3
+seed: 7777
+source_domains: None
+target_domains: None
+text_only: False
+text_prompts: False
+trainer: LaFTer
+transforms: None
+txt_cls: lafter
+txt_epochs: 400
+weight_decay: 0.0001
+workers: 4
+zero_shot: False
+************
+** Config **
+************
+DATALOADER:
+  K_TRANSFORMS: 1
+  NUM_WORKERS: 4
+  RETURN_IMG0: False
+  TEST:
+    BATCH_SIZE: 50
+    SAMPLER: SequentialSampler
+  TRAIN_U:
+    BATCH_SIZE: 32
+    N_DOMAIN: 0
+    N_INS: 16
+    SAME_AS_X: True
+    SAMPLER: RandomSampler
+  TRAIN_X:
+    BATCH_SIZE: 50
+    N_DOMAIN: 0
+    N_INS: 16
+    SAMPLER: RandomSampler
+DATASET:
+  ALL_AS_UNLABELED: False
+  CIFAR_C_LEVEL: 1
+  CIFAR_C_TYPE: 
+  NAME: EuroSAT
+  NUM_LABELED: -1
+  NUM_SHOTS: -1
+  ROOT: data
+  SOURCE_DOMAINS: ()
+  STL10_FOLD: -1
+  SUBSAMPLE_CLASSES: all
+  TARGET_DOMAINS: ()
+  VAL_PERCENT: 0.1
+INPUT:
+  COLORJITTER_B: 0.4
+  COLORJITTER_C: 0.4
+  COLORJITTER_H: 0.1
+  COLORJITTER_S: 0.4
+  CROP_PADDING: 4
+  CUTOUT_LEN: 16
+  CUTOUT_N: 1
+  GB_K: 21
+  GB_P: 0.5
+  GN_MEAN: 0.0
+  GN_STD: 0.15
+  INTERPOLATION: bilinear
+  NO_TRANSFORM: False
+  PIXEL_MEAN: [0.485, 0.456, 0.406]
+  PIXEL_STD: [0.229, 0.224, 0.225]
+  RANDAUGMENT_M: 10
+  RANDAUGMENT_N: 2
+  RGS_P: 0.2
+  RRCROP_SCALE: (0.08, 1.0)
+  SIZE: (224, 224)
+  TRANSFORMS: ()
+MODEL:
+  BACKBONE:
+    NAME: GeoRSCLIP
+    PRETRAINED: True
+  HEAD:
+    ACTIVATION: relu
+    BN: True
+    DROPOUT: 0.0
+    HIDDEN_LAYERS: ()
+    NAME: 
+  INIT_WEIGHTS: 
+OPTIM:
+  ADAM_BETA1: 0.9
+  ADAM_BETA2: 0.999
+  BASE_LR_MULT: 0.1
+  GAMMA: 0.1
+  LR: 0.0003
+  LR_SCHEDULER: single_step
+  MAX_EPOCH: 10
+  MOMENTUM: 0.9
+  NAME: adam
+  NEW_LAYERS: ()
+  RMSPROP_ALPHA: 0.99
+  SGD_DAMPNING: 0
+  SGD_NESTEROV: False
+  STAGED_LR: False
+  STEPSIZE: (-1,)
+  WARMUP_CONS_LR: 1e-05
+  WARMUP_EPOCH: -1
+  WARMUP_MIN_LR: 1e-05
+  WARMUP_RECOUNT: True
+  WARMUP_TYPE: linear
+  WEIGHT_DECAY: 0.0005
+OUTPUT_DIR: test/LaFTer/GeoRSCLIP/eurosat_50/avg_LN_Frozen
+RESUME: 
+SEED: 7777
+TEST:
+  COMPUTE_CMAT: False
+  EVALUATOR: Classification
+  FINAL_MODEL: last_step
+  NO_TEST: False
+  PER_CLASS_RESULT: False
+  SPLIT: test
+TRAIN:
+  CHECKPOINT_FREQ: 0
+  COUNT_ITER: train_x
+  PRINT_FREQ: 10
+TRAINER:
+  CDAC:
+    CLASS_LR_MULTI: 10
+    P_THRESH: 0.95
+    RAMPUP_COEF: 30
+    RAMPUP_ITRS: 1000
+    STRONG_TRANSFORMS: ()
+    TOPK_MATCH: 5
+  COCOOP:
+    CTX_INIT: 
+    N_CTX: 16
+    PREC: fp16
+  COOP:
+    CLASS_TOKEN_POSITION: end
+    CSC: False
+    CTX_INIT: 
+    N_CTX: 16
+    PREC: fp32
+  CROSSGRAD:
+    ALPHA_D: 0.5
+    ALPHA_F: 0.5
+    EPS_D: 1.0
+    EPS_F: 1.0
+  DAEL:
+    CONF_THRE: 0.95
+    STRONG_TRANSFORMS: ()
+    WEIGHT_U: 0.5
+  DAELDG:
+    CONF_THRE: 0.95
+    STRONG_TRANSFORMS: ()
+    WEIGHT_U: 0.5
+  DDAIG:
+    ALPHA: 0.5
+    CLAMP: False
+    CLAMP_MAX: 1.0
+    CLAMP_MIN: -1.0
+    G_ARCH: 
+    LMDA: 0.3
+    WARMUP: 0
+  DOMAINMIX:
+    ALPHA: 1.0
+    BETA: 1.0
+    TYPE: crossdomain
+  ENTMIN:
+    LMDA: 0.001
+  FIXMATCH:
+    CONF_THRE: 0.95
+    STRONG_TRANSFORMS: ()
+    WEIGHT_U: 1.0
+  M3SDA:
+    LMDA: 0.5
+    N_STEP_F: 4
+  MCD:
+    N_STEP_F: 4
+  MEANTEACHER:
+    EMA_ALPHA: 0.999
+    RAMPUP: 5
+    WEIGHT_U: 1.0
+  MIXMATCH:
+    MIXUP_BETA: 0.75
+    RAMPUP: 20000
+    TEMP: 2.0
+    WEIGHT_U: 100.0
+  MME:
+    LMDA: 0.1
+  NAME: LaFTer
+  SE:
+    CONF_THRE: 0.95
+    EMA_ALPHA: 0.999
+    RAMPUP: 300
+USE_CUDA: True
+VERBOSE: True
+VERSION: 1
+gpt_prompts: False
+txt_cls: lafter
+Loading trainer: LaFTer
+Loading dataset: EuroSAT
+Reading split from /l/users/sanoojan.baliah/Felix/RS_zero_shot/data/eurosat/split_zhou_EuroSAT.json
+* Using custom transform for training
+* Using custom transform for testing
+---------  -------
+Dataset    EuroSAT
+# classes  10
+# train_x  13,500
+# val      5,400
+# test     8,100
+---------  -------
+Loading CLIP (backbone: GeoRSCLIP)
+_______________________________
+all_weights/RS5M_ViT-B-32.pt
+_______________________________
+Building ZERO-SHOT-MODEL CLIP
+******** Loaded Already Saved Embeddings *********
+Loading evaluator: Classification
+------------------ Learnable Parameters ------------------
+	adapter.0.weight, 5120, torch.Size([10, 512])
+----------------------------------------------------------
+------------------ Learnable Parameters ------------------
+	prompt_embeddings, 38400, torch.Size([1, 50, 768])
+	model.visual.ln_pre.weight, 768, torch.Size([768])
+	model.visual.ln_pre.bias, 768, torch.Size([768])
+	model.visual.transformer.resblocks.0.ln_1.weight, 768, torch.Size([768])
+	model.visual.transformer.resblocks.0.ln_1.bias, 768, torch.Size([768])
+	model.visual.transformer.resblocks.0.ln_2.weight, 768, torch.Size([768])
+	model.visual.transformer.resblocks.0.ln_2.bias, 768, torch.Size([768])
+	model.visual.transformer.resblocks.1.ln_1.weight, 768, torch.Size([768])
+	model.visual.transformer.resblocks.1.ln_1.bias, 768, torch.Size([768])
+	model.visual.transformer.resblocks.1.ln_2.weight, 768, torch.Size([768])
+	model.visual.transformer.resblocks.1.ln_2.bias, 768, torch.Size([768])
+	model.visual.transformer.resblocks.2.ln_1.weight, 768, torch.Size([768])
+	model.visual.transformer.resblocks.2.ln_1.bias, 768, torch.Size([768])
+	model.visual.transformer.resblocks.2.ln_2.weight, 768, torch.Size([768])
+	model.visual.transformer.resblocks.2.ln_2.bias, 768, torch.Size([768])
+	model.visual.transformer.resblocks.3.ln_1.weight, 768, torch.Size([768])
+	model.visual.transformer.resblocks.3.ln_1.bias, 768, torch.Size([768])
+	model.visual.transformer.resblocks.3.ln_2.weight, 768, torch.Size([768])
+	model.visual.transformer.resblocks.3.ln_2.bias, 768, torch.Size([768])
+	model.visual.transformer.resblocks.4.ln_1.weight, 768, torch.Size([768])
+	model.visual.transformer.resblocks.4.ln_1.bias, 768, torch.Size([768])
+	model.visual.transformer.resblocks.4.ln_2.weight, 768, torch.Size([768])
+	model.visual.transformer.resblocks.4.ln_2.bias, 768, torch.Size([768])
+	model.visual.transformer.resblocks.5.ln_1.weight, 768, torch.Size([768])
+	model.visual.transformer.resblocks.5.ln_1.bias, 768, torch.Size([768])
+	model.visual.transformer.resblocks.5.ln_2.weight, 768, torch.Size([768])
+	model.visual.transformer.resblocks.5.ln_2.bias, 768, torch.Size([768])
+	model.visual.transformer.resblocks.6.ln_1.weight, 768, torch.Size([768])
+	model.visual.transformer.resblocks.6.ln_1.bias, 768, torch.Size([768])
+	model.visual.transformer.resblocks.6.ln_2.weight, 768, torch.Size([768])
+	model.visual.transformer.resblocks.6.ln_2.bias, 768, torch.Size([768])
+	model.visual.transformer.resblocks.7.ln_1.weight, 768, torch.Size([768])
+	model.visual.transformer.resblocks.7.ln_1.bias, 768, torch.Size([768])
+	model.visual.transformer.resblocks.7.ln_2.weight, 768, torch.Size([768])
+	model.visual.transformer.resblocks.7.ln_2.bias, 768, torch.Size([768])
+	model.visual.transformer.resblocks.8.ln_1.weight, 768, torch.Size([768])
+	model.visual.transformer.resblocks.8.ln_1.bias, 768, torch.Size([768])
+	model.visual.transformer.resblocks.8.ln_2.weight, 768, torch.Size([768])
+	model.visual.transformer.resblocks.8.ln_2.bias, 768, torch.Size([768])
+	model.visual.transformer.resblocks.9.ln_1.weight, 768, torch.Size([768])
+	model.visual.transformer.resblocks.9.ln_1.bias, 768, torch.Size([768])
+	model.visual.transformer.resblocks.9.ln_2.weight, 768, torch.Size([768])
+	model.visual.transformer.resblocks.9.ln_2.bias, 768, torch.Size([768])
+	model.visual.transformer.resblocks.10.ln_1.weight, 768, torch.Size([768])
+	model.visual.transformer.resblocks.10.ln_1.bias, 768, torch.Size([768])
+	model.visual.transformer.resblocks.10.ln_2.weight, 768, torch.Size([768])
+	model.visual.transformer.resblocks.10.ln_2.bias, 768, torch.Size([768])
+	model.visual.transformer.resblocks.11.ln_1.weight, 768, torch.Size([768])
+	model.visual.transformer.resblocks.11.ln_1.bias, 768, torch.Size([768])
+	model.visual.transformer.resblocks.11.ln_2.weight, 768, torch.Size([768])
+	model.visual.transformer.resblocks.11.ln_2.bias, 768, torch.Size([768])
+	model.visual.ln_post.weight, 768, torch.Size([768])
+	model.visual.ln_post.bias, 768, torch.Size([768])
+	model.transformer.resblocks.0.ln_1.weight, 512, torch.Size([512])
+	model.transformer.resblocks.0.ln_1.bias, 512, torch.Size([512])
+	model.transformer.resblocks.0.ln_2.weight, 512, torch.Size([512])
+	model.transformer.resblocks.0.ln_2.bias, 512, torch.Size([512])
+	model.transformer.resblocks.1.ln_1.weight, 512, torch.Size([512])
+	model.transformer.resblocks.1.ln_1.bias, 512, torch.Size([512])
+	model.transformer.resblocks.1.ln_2.weight, 512, torch.Size([512])
+	model.transformer.resblocks.1.ln_2.bias, 512, torch.Size([512])
+	model.transformer.resblocks.2.ln_1.weight, 512, torch.Size([512])
+	model.transformer.resblocks.2.ln_1.bias, 512, torch.Size([512])
+	model.transformer.resblocks.2.ln_2.weight, 512, torch.Size([512])
+	model.transformer.resblocks.2.ln_2.bias, 512, torch.Size([512])
+	model.transformer.resblocks.3.ln_1.weight, 512, torch.Size([512])
+	model.transformer.resblocks.3.ln_1.bias, 512, torch.Size([512])
+	model.transformer.resblocks.3.ln_2.weight, 512, torch.Size([512])
+	model.transformer.resblocks.3.ln_2.bias, 512, torch.Size([512])
+	model.transformer.resblocks.4.ln_1.weight, 512, torch.Size([512])
+	model.transformer.resblocks.4.ln_1.bias, 512, torch.Size([512])
+	model.transformer.resblocks.4.ln_2.weight, 512, torch.Size([512])
+	model.transformer.resblocks.4.ln_2.bias, 512, torch.Size([512])
+	model.transformer.resblocks.5.ln_1.weight, 512, torch.Size([512])
+	model.transformer.resblocks.5.ln_1.bias, 512, torch.Size([512])
+	model.transformer.resblocks.5.ln_2.weight, 512, torch.Size([512])
+	model.transformer.resblocks.5.ln_2.bias, 512, torch.Size([512])
+	model.transformer.resblocks.6.ln_1.weight, 512, torch.Size([512])
+	model.transformer.resblocks.6.ln_1.bias, 512, torch.Size([512])
+	model.transformer.resblocks.6.ln_2.weight, 512, torch.Size([512])
+	model.transformer.resblocks.6.ln_2.bias, 512, torch.Size([512])
+	model.transformer.resblocks.7.ln_1.weight, 512, torch.Size([512])
+	model.transformer.resblocks.7.ln_1.bias, 512, torch.Size([512])
+	model.transformer.resblocks.7.ln_2.weight, 512, torch.Size([512])
+	model.transformer.resblocks.7.ln_2.bias, 512, torch.Size([512])
+	model.transformer.resblocks.8.ln_1.weight, 512, torch.Size([512])
+	model.transformer.resblocks.8.ln_1.bias, 512, torch.Size([512])
+	model.transformer.resblocks.8.ln_2.weight, 512, torch.Size([512])
+	model.transformer.resblocks.8.ln_2.bias, 512, torch.Size([512])
+	model.transformer.resblocks.9.ln_1.weight, 512, torch.Size([512])
+	model.transformer.resblocks.9.ln_1.bias, 512, torch.Size([512])
+	model.transformer.resblocks.9.ln_2.weight, 512, torch.Size([512])
+	model.transformer.resblocks.9.ln_2.bias, 512, torch.Size([512])
+	model.transformer.resblocks.10.ln_1.weight, 512, torch.Size([512])
+	model.transformer.resblocks.10.ln_1.bias, 512, torch.Size([512])
+	model.transformer.resblocks.10.ln_2.weight, 512, torch.Size([512])
+	model.transformer.resblocks.10.ln_2.bias, 512, torch.Size([512])
+	model.transformer.resblocks.11.ln_1.weight, 512, torch.Size([512])
+	model.transformer.resblocks.11.ln_1.bias, 512, torch.Size([512])
+	model.transformer.resblocks.11.ln_2.weight, 512, torch.Size([512])
+	model.transformer.resblocks.11.ln_2.bias, 512, torch.Size([512])
+	model.ln_final.weight, 512, torch.Size([512])
+	model.ln_final.bias, 512, torch.Size([512])
+	adapter.0.weight, 5120, torch.Size([10, 512])
+----------------------------------------------------------
+------LN Frozen------
+<<<<<<<<<<<<<<<<<<<<<<Learnable Parameters>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+Epoch: 0
+-------------------------------------
+avg
+-------------------------------------
