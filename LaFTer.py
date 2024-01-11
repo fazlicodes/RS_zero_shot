@@ -270,8 +270,8 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
                 output_text = model.forward_normal_for_pl(input[0])
             out = model.forward_aug_with_prompts(input[1].float().cuda())
 
-            pseudo_label_text = F.softmax(output_text, dim=-1)  # / 0.04
-            pseudo_label_text = pseudo_label_text.argmax(dim=1, keepdim=True)
+            pseudo_label_text_softmax = F.softmax(output_text, dim=-1)  # / 0.04
+            pseudo_label_text = pseudo_label_text_softmax.argmax(dim=1, keepdim=True)
             pseudo_label_text = pseudo_label_text.flatten().cuda()
             pl_text_acc.update((pseudo_label_text == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
 
@@ -279,13 +279,14 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
                 # Get Pseudo Label from Zero-Shot
                 with torch.no_grad():
                     output_zs = model.forward_pl_zeroshot(input[0])
-                    pseudo_label_zero_shot = F.softmax(output_zs, dim=-1).argmax(dim=1, keepdim=True)
+                    pseudo_label_zero_shot_softmax = F.softmax(output_zs, dim=-1)
+                    pseudo_label_zero_shot = pseudo_label_zero_shot_softmax.argmax(dim=1, keepdim=True)
                     pseudo_label_zero_shot = pseudo_label_zero_shot.flatten().cuda()
                     pl_zs_acc.update((pseudo_label_zero_shot == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
 
                 # clip_conf = output_zs.softmax(dim=-1).max(dim=-1).values.mean().item
 
-                if "fixed_alpha" in args.bws:
+                if args.bws=="fixed_alpha":
                     # Choose a value for alpha in the range [0, 1]
                     alpha = args.bws.split('_')[-1]
                     combined_tensor = alpha * output_zs + (1 - alpha) * output_text
@@ -326,11 +327,12 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
             if args.svl_pl:
 
                 # Get Pseudo Label from SVL
-                # with torch.no_grad():
-                output_svl = model.forward_svl(input[0])
-                pseudo_label_svl = F.softmax(output_svl, dim=-1).argmax(dim=1, keepdim=True)
-                pseudo_label_svl = pseudo_label_svl.flatten().cuda()
-                pl_svl_acc.update((pseudo_label_svl == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
+                with torch.no_grad():
+                    output_svl = model.forward_svl(input[0])
+                    pseudo_label_svl_softmax = F.softmax(output_svl, dim=-1)
+                    pseudo_label_svl = pseudo_label_svl_softmax.argmax(dim=1, keepdim=True)
+                    pseudo_label_svl = pseudo_label_svl.flatten().cuda()
+                    pl_svl_acc.update((pseudo_label_svl == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
 
                 with torch.no_grad():
                     output_zs = model.forward_pl_zeroshot(input[0])
@@ -341,6 +343,7 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
                 if args.bws=="avg":
                     # Combine the tensors along a new dimension (e.g., concatenate along a new dimension)
                     combined_tensor = torch.stack([output_zs, output_text, output_svl], dim=2)
+                    # combined_tensor = torch.stack([output_text, output_svl], dim=2)
                     # Average along the new dimension
                     average_tensor = torch.mean(combined_tensor, dim=2)
                     pseudo_label_text = F.softmax(average_tensor, dim=1)
@@ -357,9 +360,27 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
                     pl_new = (output_zs*alpha[:, 0].unsqueeze(1) +  output_text*alpha[:, 1].unsqueeze(1) + output_svl*alpha[:, 2].unsqueeze(1))
                     pl_new = torch.flatten(F.softmax(pl_new, dim=-1).argmax(dim=1, keepdim=True))
                     #Change later
-                    pseudo_label_text = pl_new 
+                    pseudo_label_text = pl_new
+                    breakpoint()
+                    
+                elif "fixed_alpha_for_three_pl" in args.bws:
+                    alpha_pl_1=torch.tensor([0.5]).cuda()
+                    alpha_pl_2=torch.tensor([0.2]).cuda()
+                    alpha_pl_3=torch.tensor([0.3]).cuda()
+                    combined_tensor = alpha_pl_2 * output_zs + alpha_pl_1 * output_text + alpha_pl_3 * output_svl
+                    # average_tensor = torch.mean(combined_tensor, dim=1)
+                    # breakpoint()
+                    #apply softmax for the combined tensor
+                    average_tensor = F.softmax(combined_tensor, dim=1)
+                    #apply argmax to the average tensor
+                    pseudo_label_text = torch.argmax(average_tensor, dim=1).flatten().cuda()
 
-            loss = criteria(out.squeeze(), pseudo_label_text)
+                    # pseudo_label_text = torch.argmax(average_tensor, dim=1).flatten().cuda()
+                    # breakpoint()
+
+            # breakpoint()
+            loss = criteria(out.squeeze(), pseudo_label_text) #torch.Size([50, 10]),
+            # breakpoint()
             total_loss.update(loss.item(),len(tr_loader))
 
             if i % args.print_freq == 0:
@@ -394,6 +415,7 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
         print(f'Pseudo Label Text Accuracy: {pl_text_acc.avg}')
         print(f'Pseudo Label Zero Shot Accuracy: {pl_zs_acc.avg}')
         print(f'Pseudo Label SVL Accuracy: {pl_svl_acc.avg}')
+        print(f'Val Accuracy: {val_acc}')
 
         best_test_acc=None
         if val_acc>best_acc:
@@ -537,7 +559,7 @@ if __name__ == "__main__":
     parser.add_argument('--txt_epochs', type=int, default=1000)
     parser.add_argument('--logfolder', default='logs', type=str)
     parser.add_argument('--text_only', action="store_true")
-    parser.add_argument('--bws', type=str, default="None", choices=['conf_alpha','fixed_alpha_0.25', 'avg'])
+    parser.add_argument('--bws', type=str, default="None", choices=['conf_alpha','fixed_alpha_0.25', 'avg','fixed_alpha_for_three_pl'])
     parser.add_argument('--ln_frozen', action="store_true")
     parser.add_argument('--svl_pl', action="store_true")
     parser.add_argument('--svl_model_path', type=str, default=None)

@@ -230,9 +230,9 @@ class LaFTerUFT(nn.Module):
             param.requires_grad = False 
 
     def forward_svl(self, x):
-        # with torch.no_grad():
-        op = self.svl_enc(x, only_feats=True)
-        op = self.svl_adapter(op['feat'])
+        with torch.no_grad():
+            op = self.svl_enc(x, only_feats=True)
+            op = self.svl_adapter(op['feat'])
         return op
     
     def forward_normal_for_pl(self, x1):
