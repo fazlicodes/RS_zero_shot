@@ -206,15 +206,19 @@ def train_txt_cls(args, model):
         loss.backward()
         optimizer.step()
     model.txt_cls_init()
+    
 
 def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
 
     # first train text classifier
     train_txt_cls(args, model)
+    
 
     all_acc = list()
     optimizer, scheduler, criteria = setup_lafter_training_utils(args, model)
-    
+    if args.svl_pl:
+        #  initialize the svl adapter
+        model.svl_adapter_init(args=args)
     if args.ln_frozen:
         print("------LN Frozen------")
         #Freeze CLIP
@@ -233,6 +237,8 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
     columns = ['Epoch', 'PS Text Acc','PS ZS Acc', 'Epoch Loss', 'Validation Accuracy', 'Test Accuracy','Best Model']
     # df = pd.DataFrame(columns=columns)
     df_to_append = []
+    early_stopping_counter = 0
+    early_stopping_threshold = 30 
 
     for epoch in range(args.epochs):
         print(f'Epoch: {epoch}')
@@ -242,10 +248,9 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
         
 
         pl_text_acc = lossmeter()
-        pl_text_acc.reset()
         pl_zs_acc = lossmeter()
-        pl_zs_acc.reset()
         total_loss = lossmeter()
+        pl_svl_acc = lossmeter()
 
         print("-------------------------------------")
         print(args.bws)
@@ -318,6 +323,42 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
                     #Change later
                     pseudo_label_text = pl_new
 
+            if args.svl_pl:
+
+                # Get Pseudo Label from SVL
+                # with torch.no_grad():
+                output_svl = model.forward_svl(input[0])
+                pseudo_label_svl = F.softmax(output_svl, dim=-1).argmax(dim=1, keepdim=True)
+                pseudo_label_svl = pseudo_label_svl.flatten().cuda()
+                pl_svl_acc.update((pseudo_label_svl == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
+
+                with torch.no_grad():
+                    output_zs = model.forward_pl_zeroshot(input[0])
+                    pseudo_label_zero_shot = F.softmax(output_zs, dim=-1).argmax(dim=1, keepdim=True)
+                    pseudo_label_zero_shot = pseudo_label_zero_shot.flatten().cuda()
+                    pl_zs_acc.update((pseudo_label_zero_shot == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
+
+                if args.bws=="avg":
+                    # Combine the tensors along a new dimension (e.g., concatenate along a new dimension)
+                    combined_tensor = torch.stack([output_zs, output_text, output_svl], dim=2)
+                    # Average along the new dimension
+                    average_tensor = torch.mean(combined_tensor, dim=2)
+                    pseudo_label_text = F.softmax(average_tensor, dim=1)
+                    pseudo_label_text = pseudo_label_text.argmax(dim=1)
+                    # Ensure pseudo_label_text is 1D or flatten it
+                    if pseudo_label_text.dim() > 1:
+                        pseudo_label_text = pseudo_label_text.view(-1)
+
+                elif args.bws=="conf_alpha":
+                    # BWS Computation: Alpha = softmax(concat(pl_zs,pl_text))
+                    alpha = torch.cat([torch.max(F.softmax(output_zs),dim=1)[0].unsqueeze(1),torch.max(F.softmax(output_text),dim=1)[0].unsqueeze(1),torch.max(F.softmax(output_svl),dim=1)[0].unsqueeze(1)], dim=-1)
+                    alpha = F.softmax(alpha, dim=-1)
+                    # New Psuedo Label
+                    pl_new = (output_zs*alpha[:, 0].unsqueeze(1) +  output_text*alpha[:, 1].unsqueeze(1) + output_svl*alpha[:, 2].unsqueeze(1))
+                    pl_new = torch.flatten(F.softmax(pl_new, dim=-1).argmax(dim=1, keepdim=True))
+                    #Change later
+                    pseudo_label_text = pl_new 
+
             loss = criteria(out.squeeze(), pseudo_label_text)
             total_loss.update(loss.item(),len(tr_loader))
 
@@ -349,13 +390,16 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
         ps_text_acc=pl_text_acc.avg
         ps_zs_acc=pl_zs_acc.avg
 
+
         print(f'Pseudo Label Text Accuracy: {pl_text_acc.avg}')
         print(f'Pseudo Label Zero Shot Accuracy: {pl_zs_acc.avg}')
+        print(f'Pseudo Label SVL Accuracy: {pl_svl_acc.avg}')
 
         best_test_acc=None
         if val_acc>best_acc:
             best_val_acc="Yes"
             best_acc=val_acc
+            early_stopping_counter = 0 
             print('------------')
             print("Best Epoch ", epoch)
             print("Best Val acc", val_acc)
@@ -365,8 +409,13 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
 
             #Save the whole model
             torch.save(model.state_dict(), os.path.join(args.output_dir, "model_best.pth")) 
-
+        else:
+            early_stopping_counter += 1
         df_to_append.append([epoch, ps_text_acc, ps_zs_acc, total_loss.avg, val_acc, best_test_acc, best_val_acc])
+        print("Output dir: ",args.output_dir)
+        if early_stopping_counter >= early_stopping_threshold:
+            print(f'Early stopping at epoch {epoch} due to no improvement in validation accuracy.')
+            break
     df = pd.DataFrame(df_to_append, columns=columns)    
     csv_path = os.path.join(args.output_dir, "training_metrics.csv")
     df.to_csv(csv_path, index=False)
@@ -490,6 +539,8 @@ if __name__ == "__main__":
     parser.add_argument('--text_only', action="store_true")
     parser.add_argument('--bws', type=str, default="None", choices=['conf_alpha','fixed_alpha_0.25', 'avg'])
     parser.add_argument('--ln_frozen', action="store_true")
+    parser.add_argument('--svl_pl', action="store_true")
+    parser.add_argument('--svl_model_path', type=str, default=None)
     args = parser.parse_args()
     args.mile_stones = None
     

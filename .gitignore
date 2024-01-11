@@ -7,7 +7,7 @@ scripts/.*
 test*.py
 .nfs*
 configs/trainers/text_cls/*
-
+svl_adapter_models/
 embeddings/
 
 # Python specific

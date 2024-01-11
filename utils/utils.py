@@ -73,6 +73,7 @@ def setup_lafter_training_utils(args, model):
     model = model.cuda()
     model = model.float()
     params = list()
+    args.entropy = True
     for key, value in model.named_parameters():
         if key == 'prompt_embeddings':
             value.requires_grad = True

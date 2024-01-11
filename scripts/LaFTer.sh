@@ -6,8 +6,9 @@ CFG=vit_b32 #'GeoRSCLIP' or 'vit_b32' or 'RemoteCLIP' or 'EVA02_CLIP_B_psz16_s8B
 dset="$1"
 txt_cls=lafter
 nos_epochs=50
-bws="avg" # 'conf_alpha' or 'fixed_alpha_{value}' with alpha rate or 'avg'
-CUDA_VISIBLE_DEVICES=0 python LaFTer.py \
+svl_model_path=svl_adapter_models
+bws="conf_alpha" # 'conf_alpha' or 'fixed_alpha_{value}' with alpha rate or 'avg'
+CUDA_VISIBLE_DEVICES=2 python LaFTer.py \
 --root ${DATA} \
 --trainer ${TRAINER} \
 --dataset-config-file configs/datasets/"${dset}".yaml \
@@ -18,3 +19,6 @@ CUDA_VISIBLE_DEVICES=0 python LaFTer.py \
 --txt_cls ${txt_cls} \
 --bws ${bws} \
 --batch_size 50
+--svl_pl \
+--svl_model_path ${svl_model_path}
+# --ln_frozen \
