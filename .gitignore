@@ -8,6 +8,11 @@ scripts/.*
 configs/trainers/text_cls/*
 test*.py
 embeddings/
+test*/
+descriptions/*.json
+svl_adapter_models/
+
+
 
 # Python specific
 *.pyc
