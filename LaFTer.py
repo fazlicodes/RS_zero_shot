@@ -11,6 +11,7 @@ import datasets.oxford_flowers
 import datasets.fgvc_aircraft
 import datasets.dtd
 import datasets.eurosat
+import datasets.aid
 import datasets.food101
 import datasets.sun397
 import datasets.ucf101
@@ -25,7 +26,8 @@ from utils.utils import *
 import os
 from dassl.utils import Registry
 from datasets import RESISC45
-
+from datasets import AID
+from datasets import PatternNet
 
 def print_args(args, cfg):
     print("***************")

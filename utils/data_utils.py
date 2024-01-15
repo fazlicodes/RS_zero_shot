@@ -1247,6 +1247,16 @@ ds_specific_templates = {
         'a centered satellite photo of a {}.',
         'a centered satellite photo of the {}.',
     ],
+    'AID':[
+        'a centered satellite photo of {}.',
+        'a centered satellite photo of a {}.',
+        'a centered satellite photo of the {}.',
+    ],
+    'PatternNet':[
+        'a centered satellite photo of {}.',
+        'a centered satellite photo of a {}.',
+        'a centered satellite photo of the {}.',
+    ],
     'OxfordFlowers': [
         'a photo of a {}, a type of flower.',
     ],

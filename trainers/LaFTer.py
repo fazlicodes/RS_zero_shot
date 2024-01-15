@@ -140,7 +140,7 @@ class LaFTerUFT(nn.Module):
                         class_embeddings /= class_embeddings.norm(dim=-1, keepdim=True)  # L2 norm of the embeddings (dim 2)
                         zeroshot_weights.append(class_embeddings)
                     zeroshot_weights = torch.stack(zeroshot_weights).cuda()  # (512, 10) --> 512 embeddings for 10 classes'
-                    torch.save(zeroshot_weights, f'embeddings/{self.txt_cls}_{self.dataset_name}_embeddings.pt')
+                    # torch.save(zeroshot_weights, f'embeddings/{self.txt_cls}_{self.dataset_name}_embeddings.pt')
 
             return zeroshot_weights.squeeze(), labels_for_descriptions
 

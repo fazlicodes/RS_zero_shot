@@ -15,7 +15,7 @@ import random
 from pathlib import Path
 
 
-lafter_datasets = ['DescribableTextures',  'EuroSAT', 'OxfordFlowers', 'SUN397','RESISC45', 'UCF101', 'ImageNetR', 'ImageNetSketch',
+lafter_datasets = ['DescribableTextures',  'EuroSAT','AID', 'PatternNet', 'OxfordFlowers', 'SUN397','RESISC45', 'UCF101', 'ImageNetR', 'ImageNetSketch',
                    'ImageNetA', 'CIFAR10_local', 'CIFAR100_local', 'ImageNet', 'Caltech101']
 
 
@@ -149,7 +149,9 @@ def test_prompting(teloader, model,model_path=None):
 text_cls_epochs = {
     'DescribableTextures': 400, # 5.5k for txt_cls
     'EuroSAT': 400,
+    'AID': 400,
     'RESISC45': 400,
+    'PatternNet': 400,
     'FGVCAircraft': 500,
     'Food101': 400,
     'CIFAR10_local': 400,
