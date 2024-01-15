@@ -4,6 +4,8 @@ all_weights/
 Dassl.pytorch/
 output*/
 scripts/.*
+test/
+test*/
 .nfs*
 configs/trainers/text_cls/*
 
