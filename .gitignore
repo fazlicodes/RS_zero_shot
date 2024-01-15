@@ -8,7 +8,7 @@ test*.py
 .nfs*
 configs/trainers/text_cls/*
 svl_adapter_models/
-test/
+test*/
 trainers/svl.py
 
 embeddings/
