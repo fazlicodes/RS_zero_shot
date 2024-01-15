@@ -509,6 +509,7 @@ if __name__ == "__main__":
     parser.add_argument('--bws', type=str, default='None', choices=['conf_alpha','fixed_alpha_0.25', 'avg', 'None'])
     parser.add_argument('--ln_frozen', action="store_true")
     parser.add_argument('--loss_fn', default='crossentropy')
+    parser.add_argument('--train_text_ln', action="store_true")
     args = parser.parse_args()
     args.mile_stones = None
     
