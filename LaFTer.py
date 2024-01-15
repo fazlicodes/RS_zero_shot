@@ -207,8 +207,18 @@ def train_txt_cls(args, model):
         optimizer.step()
     model.txt_cls_init()
 
-def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
+def start_seed():
+    seed = args.seed
+    random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+    np.random.seed(seed)
 
+def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
+    # start_seed()
     # first train text classifier
     train_txt_cls(args, model)
 
@@ -233,6 +243,10 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
     columns = ['Epoch', 'PS Text Acc','PS ZS Acc', 'Epoch Loss', 'Validation Accuracy', 'Test Accuracy','Best Model']
     # df = pd.DataFrame(columns=columns)
     df_to_append = []
+
+    # Initialize early stopping parameters
+    early_stopping_counter = 0
+    early_stopping_threshold = 25
 
     for epoch in range(args.epochs):
         print(f'Epoch: {epoch}')
@@ -356,6 +370,7 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
         if val_acc>best_acc:
             best_val_acc="Yes"
             best_acc=val_acc
+            early_stopping_counter = 0
             print('------------')
             print("Best Epoch ", epoch)
             print("Best Val acc", val_acc)
@@ -365,8 +380,13 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
 
             #Save the whole model
             torch.save(model.state_dict(), os.path.join(args.output_dir, "model_best.pth")) 
-
+        else:
+            early_stopping_counter += 1
+        print("Output dir: ", args.output_dir)
         df_to_append.append([epoch, ps_text_acc, ps_zs_acc, total_loss.avg, val_acc, best_test_acc, best_val_acc])
+        if early_stopping_counter >= early_stopping_threshold:
+            print(f'Early stopping at epoch {epoch} due to no improvement in validation accuracy.')
+            break
     df = pd.DataFrame(df_to_append, columns=columns)    
     csv_path = os.path.join(args.output_dir, "training_metrics.csv")
     df.to_csv(csv_path, index=False)
@@ -488,7 +508,7 @@ if __name__ == "__main__":
     parser.add_argument('--txt_epochs', type=int, default=1000)
     parser.add_argument('--logfolder', default='logs', type=str)
     parser.add_argument('--text_only', action="store_true")
-    parser.add_argument('--bws', type=str, default="None", choices=['conf_alpha','fixed_alpha_0.25', 'avg'])
+    parser.add_argument('--bws', type=str, default="None", choices=['None','conf_alpha','fixed_alpha_0.25', 'avg'])
     parser.add_argument('--ln_frozen', action="store_true")
     args = parser.parse_args()
     args.mile_stones = None
