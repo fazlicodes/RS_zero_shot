@@ -48,9 +48,11 @@ def process_json_files(imagenet_file, dataset_file, output_file, dataset):
     new_data = {"other": [value for values in original_data.values() for value in values]}
 
     if dataset=="RESISC45":
-        samples=225
+        # samples=225
+        samples=int(input("Enter the number of noise samples for the other datasets: "))
     elif dataset=="EuroSAT":
-        samples=25
+        # samples=25
+        samples=int(input("Enter the number of noise samples for the other datasets: "))
     else:
         # Input samples for other datasets
         samples=int(input("Enter the number of noise samples for the other datasets: "))
@@ -127,9 +129,16 @@ class LaFTerUFT(nn.Module):
             if self.dataset_name not in lafter_datasets:
                 raise ValueError('Invalid dataset name for LaFTer')
             
-            process_json_files('./descriptions/generic/ImageNet.json', f'./descriptions/generic/{self.dataset_name}.json', f'./descriptions/generic/{self.dataset_name}_noised.json', self.dataset_name)
+            # process_json_files('./descriptions/generic/ImageNet.json', f'./descriptions/generic/{self.dataset_name}.json', f'./descriptions/generic/{self.dataset_name}_noised.json', self.dataset_name)
 
-            path_to_file = f'./descriptions/generic/{self.dataset_name}_noised.json'
+            add_noise = input("Do you want to add noise to the generic prompts? (y/n): ")
+            if add_noise == 'y':
+                process_json_files('./descriptions/generic/ImageNet.json', f'./descriptions/generic/{self.dataset_name}.json', f'./descriptions/generic/{self.dataset_name}_noised.json', self.dataset_name)
+                path_to_file = f'./descriptions/generic/{self.dataset_name}_noised.json'
+            else:
+                path_to_file = f'./descriptions/generic/{self.dataset_name}.json'
+
+
             with open(path_to_file) as f:
                 gpt3_prompts = json.load(f)
 
