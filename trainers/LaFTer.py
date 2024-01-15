@@ -41,6 +41,34 @@ def load_clip_to_cpu(cfg):
 
     return model
 
+def process_json_files(imagenet_file, dataset_file, output_file, dataset):
+    with open(imagenet_file, 'r') as file:
+        original_data = json.load(file)
+
+    new_data = {"other": [value for values in original_data.values() for value in values]}
+
+    if dataset=="RESISC45":
+        samples=225
+    elif dataset=="EuroSAT":
+        samples=25
+    else:
+        # Input samples for other datasets
+        samples=int(input("Enter the number of noise samples for the other datasets: "))
+    print("Number of noise samples: ", samples)
+
+    sampled_values = random.sample(new_data['other'], samples)
+    sampled_data = {"other": sampled_values}
+
+    with open(dataset_file, 'r') as file:
+        dataset_data = json.load(file)
+
+    #combine the two dictionaries
+    dataset_data.update(sampled_data)
+        
+    # Save the updated dataset_data to the output file
+    with open(output_file, 'w') as file:
+        json.dump(dataset_data, file, indent=4)
+
 
 class LaFTerUFT(nn.Module):
 
@@ -98,8 +126,10 @@ class LaFTerUFT(nn.Module):
 
             if self.dataset_name not in lafter_datasets:
                 raise ValueError('Invalid dataset name for LaFTer')
+            
+            process_json_files('./descriptions/generic/ImageNet.json', f'./descriptions/generic/{self.dataset_name}.json', f'./descriptions/generic/{self.dataset_name}_noised.json', self.dataset_name)
 
-            path_to_file = f'./descriptions/generic/{self.dataset_name}.json'
+            path_to_file = f'./descriptions/generic/{self.dataset_name}_noised.json'
             with open(path_to_file) as f:
                 gpt3_prompts = json.load(f)
 
