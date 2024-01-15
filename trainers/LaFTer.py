@@ -41,18 +41,20 @@ def load_clip_to_cpu(cfg):
 
     return model
 
-def process_json_files(imagenet_file, dataset_file, output_file, dataset):
+def process_json_files(imagenet_file, dataset_file, output_file, dataset, desc_noise):
     with open(imagenet_file, 'r') as file:
         original_data = json.load(file)
 
     new_data = {"other": [value for values in original_data.values() for value in values]}
 
-    if dataset=="RESISC45":
-        # samples=225
-        samples=int(input("Enter the number of noise samples for the other datasets: "))
-    elif dataset=="EuroSAT":
-        # samples=25
-        samples=int(input("Enter the number of noise samples for the other datasets: "))
+    if dataset=="EuroSAT":
+        samples=int(250*desc_noise)
+    elif dataset=="Resisc45":
+        samples=int(45*50*desc_noise)
+    elif dataset=="AID":
+        samples=int(30*50*desc_noise)
+    elif dataset=="PatternNet":
+        samples=int(38*50*desc_noise)
     else:
         # Input samples for other datasets
         samples=int(input("Enter the number of noise samples for the other datasets: "))
@@ -131,9 +133,8 @@ class LaFTerUFT(nn.Module):
             
             # process_json_files('./descriptions/generic/ImageNet.json', f'./descriptions/generic/{self.dataset_name}.json', f'./descriptions/generic/{self.dataset_name}_noised.json', self.dataset_name)
 
-            add_noise = input("Do you want to add noise to the generic prompts? (y/n): ")
-            if add_noise == 'y':
-                process_json_files('./descriptions/generic/ImageNet.json', f'./descriptions/generic/{self.dataset_name}.json', f'./descriptions/generic/{self.dataset_name}_noised.json', self.dataset_name)
+            if self.cfg.desc_noise>0:
+                process_json_files('./descriptions/generic/ImageNet.json', f'./descriptions/generic/{self.dataset_name}.json', f'./descriptions/generic/{self.dataset_name}_noised.json', self.dataset_name, self.cfg.desc_noise)
                 path_to_file = f'./descriptions/generic/{self.dataset_name}_noised.json'
             else:
                 path_to_file = f'./descriptions/generic/{self.dataset_name}.json'
