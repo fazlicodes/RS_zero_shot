@@ -106,6 +106,7 @@ def extend_cfg(cfg):
     cfg.gpt_prompts = args.gpt_prompts
     cfg.desc_noise = args.desc_noise
     cfg.classifer_random_weights = args.classifer_random_weights
+    cfg.ve_unshared = args.ve_unshared
 
 
 def setup_cfg(args):
@@ -218,6 +219,10 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
 
     all_acc = list()
     optimizer, scheduler, criteria = setup_lafter_training_utils(args, model)
+
+    if args.ve_unshared:
+        for param in model.image_features_frozen.parameters(): 
+            param.requires_grad = False
     
     if args.ln_frozen:
         print("------LN Frozen------")
@@ -514,6 +519,7 @@ if __name__ == "__main__":
     parser.add_argument('--train_text_ln', action="store_true")
     parser.add_argument('--desc_noise', type=float, default=0.0)
     parser.add_argument('--classifer_random_weights', action="store_true")
+    parser.add_argument('--ve_unshared', action="store_true")
     args = parser.parse_args()
     args.mile_stones = None
     

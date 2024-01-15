@@ -85,6 +85,7 @@ class LaFTerUFT(nn.Module):
     def __init__(self, model, classes, templates, ds_templates=None, device='cuda', log=None, dataset_name=None, txt_cls=None, cfg=None):
         super(LaFTerUFT, self).__init__()
         self.adapter_pl = None
+        self.image_features_frozen = None
         self.device = device
         self.cfg = cfg
         self.dataset_templates = ds_templates
@@ -229,7 +230,11 @@ class LaFTerUFT(nn.Module):
 
     def forward_pl_zeroshot(self, x):
         with torch.no_grad():
-            img_features = self.image_features(x)
+            if self.cfg.ve_unshared:
+                print('******** Unsharing Vision Encoders *********')
+                img_features = self.image_features_frozen_pl(x)
+            else:
+                img_features = self.image_features(x)
             pseudo_label = img_features @ self.text_features.float()
         return pseudo_label
 
@@ -251,6 +256,15 @@ class LaFTerUFT(nn.Module):
             print('******** Initializing Classifier with Random Weights *********')
             self.adapter_pl.apply(weights_init)
 
+        if self.cfg.ve_unshared:
+            self.image_features_frozen = copy.deepcopy(self.model.visual)
+
+    def image_features_frozen_pl(self, images):
+        with torch.no_grad():
+            image_features = self.image_features_frozen(images.type(self.model.dtype))
+            image_features /= image_features.norm(dim=-1, keepdim=True)
+            return image_features
+
     def forward_normal_for_pl(self, x1):
         '''
         :param x1: the clean image (without transforms, for pseudo labels, for teacher)
@@ -258,7 +272,10 @@ class LaFTerUFT(nn.Module):
         :return: features adapter (cls head), pseudo-labels
         '''
         with torch.no_grad():
-            img_features_1 = self.image_features(x1)
+            if self.cfg.ve_unshared:
+                 img_features_1 = self.image_features_frozen_pl(x1)   
+            else:
+                img_features_1 = self.image_features(x1)
             pseudo_label = self.adapter_pl(img_features_1.float()).detach()
         return pseudo_label
 
