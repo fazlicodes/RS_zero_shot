@@ -107,6 +107,7 @@ def extend_cfg(cfg):
     cfg.desc_noise = args.desc_noise
     cfg.classifer_random_weights = args.classifer_random_weights
     cfg.ve_unshared = args.ve_unshared
+    cfg.desc_emb = args.desc_emb
 
 
 def setup_cfg(args):
@@ -520,6 +521,7 @@ if __name__ == "__main__":
     parser.add_argument('--desc_noise', type=float, default=0.0)
     parser.add_argument('--classifer_random_weights', action="store_true")
     parser.add_argument('--ve_unshared', action="store_true")
+    parser.add_argument('--desc_emb', action="store_true")
     args = parser.parse_args()
     args.mile_stones = None
     

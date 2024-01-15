@@ -18,7 +18,7 @@ CUDA_VISIBLE_DEVICES=0 python LaFTer.py \
 --txt_cls ${txt_cls} \
 --batch_size 50 \
 --bws ${bws} \
---desc_noise 0.1
+# --desc_noise 0.1
 # --text_only
 # --bws ${bws} \
 # --ln_frozen \
