@@ -105,6 +105,7 @@ def extend_cfg(cfg):
     cfg.txt_cls = args.txt_cls
     cfg.gpt_prompts = args.gpt_prompts
     cfg.desc_noise = args.desc_noise
+    cfg.classifer_random_weights = args.classifer_random_weights
 
 
 def setup_cfg(args):
@@ -512,6 +513,7 @@ if __name__ == "__main__":
     parser.add_argument('--loss_fn', default='crossentropy')
     parser.add_argument('--train_text_ln', action="store_true")
     parser.add_argument('--desc_noise', type=float, default=0.0)
+    parser.add_argument('--classifer_random_weights', action="store_true")
     args = parser.parse_args()
     args.mile_stones = None
     

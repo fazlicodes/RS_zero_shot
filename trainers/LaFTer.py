@@ -41,6 +41,12 @@ def load_clip_to_cpu(cfg):
 
     return model
 
+def weights_init(m):
+    if isinstance(m, nn.Linear):
+        nn.init.xavier_uniform_(m.weight.data)
+        if m.bias is not None:
+            nn.init.zeros_(m.bias.data)
+
 def process_json_files(imagenet_file, dataset_file, output_file, dataset, desc_noise):
     with open(imagenet_file, 'r') as file:
         original_data = json.load(file)
@@ -241,6 +247,10 @@ class LaFTerUFT(nn.Module):
     def txt_cls_init(self):
         import copy
         self.adapter_pl = copy.deepcopy(self.adapter)
+        if self.cfg.classifer_random_weights:
+            print('******** Initializing Classifier with Random Weights *********')
+            self.adapter_pl.apply(weights_init)
+
     def forward_normal_for_pl(self, x1):
         '''
         :param x1: the clean image (without transforms, for pseudo labels, for teacher)
