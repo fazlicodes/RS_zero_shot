@@ -5,6 +5,8 @@ Dassl.pytorch/
 output*/
 scripts/.*
 test*.py
+test*/
+test/
 .nfs*
 configs/trainers/text_cls/*
 svl_adapter_models/
