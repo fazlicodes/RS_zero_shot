@@ -7,6 +7,7 @@ from dassl.data.data_manager import DataManager
 from clip.simple_tokenizer import SimpleTokenizer as _Tokenizer
 from clip.clip import tokenize
 _tokenizer = _Tokenizer()
+from torchvision.models import resnet50
 
 # import sys
 # sys.path.append("/l/users/sanoojan.baliah/Felix/LaFTer")
@@ -16,6 +17,7 @@ _tokenizer = _Tokenizer()
 from functools import reduce
 from operator import mul
 from utils.data_utils import ds_specific_templates
+from .svl import EmbModel, AdapterMLP
 
 def load_clip_to_cpu(cfg):
     backbone_name = cfg.MODEL.BACKBONE.NAME
@@ -113,6 +115,8 @@ class LaFTerUFT(nn.Module):
         self.txt_features_for_text_cls, self.labels_for_text_cls = self.txt_features_for_text_cls()
         self.text_features = self.txt_features()
         self.class_desc_emb = self.gen_emb()
+        self.svl_enc = None
+        self.svl_adapter = None
         
     def train_txt_clas(self, criteria):
         noise_std = 0.1
@@ -291,6 +295,33 @@ class LaFTerUFT(nn.Module):
 
         if self.cfg.ve_unshared:
             self.image_features_frozen = copy.deepcopy(self.model.visual)
+
+    def svl_adapter_init(self, args):
+
+        self.svl_enc = EmbModel(base_encoder=resnet50, args={'pretrained': True, 'projection_dim': 128, 'num_train': 1000, 'device': 'cuda', 'store_embeddings': False}).to(self.device)
+        self.svl_adapter = AdapterMLP(num_classes=len(self.classes), input_size=2048, hidden_size=256).to(self.device)
+        # breakpoint()
+        svl_enc_apth = args.svl_model_path + '/eurosat_resnet50_simclr_2024_01_07__17_03_13.pt'
+        svl_adapter_path = args.svl_model_path + '/adapter.pt'
+        # breakpoint()
+        checkpoint_enc = torch.load(svl_enc_apth)
+        checkpoint_adapter = torch.load(svl_adapter_path)
+
+        self.svl_enc.load_state_dict(checkpoint_enc['state_dict'])
+        self.svl_adapter.load_state_dict(checkpoint_adapter) 
+
+        # freeze svl_enc and adapter
+        for param in self.svl_enc.parameters():
+            param.requires_grad = False
+
+        for param in self.svl_adapter.parameters():
+            param.requires_grad = False 
+
+    def forward_svl(self, x):
+        # with torch.no_grad():
+        op = self.svl_enc(x, only_feats=True)
+        op = self.svl_adapter(op['feat'])
+        return op
 
     def image_features_frozen_pl(self, images):
         with torch.no_grad():

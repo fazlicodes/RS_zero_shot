@@ -6,6 +6,7 @@ CFG=GeoRSCLIP #'GeoRSCLIP' or 'vit_b32' or 'RemoteCLIP' or 'EVA02_CLIP_B_psz16_s
 dset="$1"
 txt_cls=lafter
 nos_epochs=50
+svl_model_path=svl_adapter_models
 bws="avg" # 'conf_alpha' or 'fixed_alpha_{value}' with alpha rate or 'avg'
 CUDA_VISIBLE_DEVICES=0 python LaFTer.py \
 --root ${DATA} \
@@ -22,3 +23,5 @@ CUDA_VISIBLE_DEVICES=0 python LaFTer.py \
 # --text_only
 # --bws ${bws} \
 # --ln_frozen \
+# --svl_pl \
+# --svl_model_path ${svl_model_path}
