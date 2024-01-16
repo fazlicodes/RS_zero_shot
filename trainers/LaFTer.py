@@ -112,7 +112,7 @@ class LaFTerUFT(nn.Module):
         nn.init.uniform_(self.prompt_embeddings.data, -val, val)
         self.txt_features_for_text_cls, self.labels_for_text_cls = self.txt_features_for_text_cls()
         self.text_features = self.txt_features()
-        self.class_desc_emb = self.gen_emb()
+        # self.class_desc_emb = self.gen_emb()
         
     def train_txt_clas(self, criteria):
         noise_std = 0.1
