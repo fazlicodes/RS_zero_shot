@@ -225,7 +225,7 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
         for param in model.image_features_frozen.parameters(): 
             param.requires_grad = False
 
-    if args.svl_pl:
+    if args.pl_technique=="pl_svl" or args.pl_technique=="pl_text_svl":
         #  initialize the svl adapter
         model.svl_adapter_init(args=args)
     
@@ -332,6 +332,7 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
                         raise NotImplementedError
                     
                 elif args.pl_technique=="pl_svl":
+                    # print (" Get Pseudo Label from SVL")
                     # Get Pseudo Label from SVL
                     with torch.no_grad():
                         output_svl = model.forward_svl(input[0])
@@ -364,6 +365,18 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
                         raise NotImplementedError
                 
                 elif args.pl_technique=="pl_text_svl":
+                    with torch.no_grad():
+                        output_zs = model.forward_pl_zeroshot(input[0])
+                        pseudo_label_zero_shot = F.softmax(output_zs, dim=-1).argmax(dim=1, keepdim=True)
+                        pseudo_label_zero_shot = pseudo_label_zero_shot.flatten().cuda()
+                        pl_zs_acc.update((pseudo_label_zero_shot == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
+                    
+                    with torch.no_grad():
+                        output_svl = model.forward_svl(input[0])
+                        pseudo_label_svl = F.softmax(output_svl, dim=-1).argmax(dim=1, keepdim=True)
+                        pseudo_label_svl = pseudo_label_svl.flatten().cuda()
+                        pl_svl_acc.update((pseudo_label_svl == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
+
                     if args.bws=="avg":
                         # Combine the tensors along a new dimension (e.g., concatenate along a new dimension)
                         combined_tensor = torch.stack([output_zs, output_text, output_svl], dim=2)
@@ -582,7 +595,7 @@ if __name__ == "__main__":
     parser.add_argument('--classifer_random_weights', action="store_true")
     parser.add_argument('--ve_unshared', action="store_true")
     parser.add_argument('--desc_emb', action="store_true")
-    parser.add_argument('--svl_pl', action="store_true")
+    # parser.add_argument('--svl_pl', action="store_true")
     parser.add_argument('--svl_model_path', type=str, default=None)
     parser.add_argument('--pl_technique', type=str, default='None', choices=['None', 'pl_text', 'pl_svl', 'pl_text_svl'])
     args = parser.parse_args()
