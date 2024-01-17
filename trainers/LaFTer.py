@@ -266,7 +266,7 @@ class LaFTerUFT(nn.Module):
                 img_features = self.image_features(x)
 
             if self.cfg.desc_emb:
-                pseudo_label = img_features @ self.class_desc_emb
+                pseudo_label = img_features @ self.class_desc_emb.float()
             else:
                 pseudo_label = img_features @ self.text_features.float()
         return pseudo_label

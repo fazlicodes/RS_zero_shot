@@ -22,4 +22,4 @@ CUDA_VISIBLE_DEVICES=0 python LaFTer.py \
 # --desc_noise 0.1
 # --text_only
 # --bws ${bws} \
-# --ln_frozen \
+# --ln_frozen 
