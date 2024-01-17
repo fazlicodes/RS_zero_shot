@@ -246,7 +246,7 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
 
     # Initialize early stopping parameters
     early_stopping_counter = 0
-    early_stopping_threshold = 30
+    early_stopping_threshold = 20
 
     for epoch in range(args.epochs):
         print(f'Epoch: {epoch}')
@@ -294,7 +294,7 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
 
                 # clip_conf = output_zs.softmax(dim=-1).max(dim=-1).values.mean().item
 
-                if "fixed_alpha" in args.bws:
+                if args.bws=="fixed_alpha":
                     # Choose a value for alpha in the range [0, 1]
                     alpha = args.bws.split('_')[-1]
                     combined_tensor = alpha * output_zs + (1 - alpha) * output_text

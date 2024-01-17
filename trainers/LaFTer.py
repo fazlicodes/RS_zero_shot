@@ -112,7 +112,7 @@ class LaFTerUFT(nn.Module):
         nn.init.uniform_(self.prompt_embeddings.data, -val, val)
         self.txt_features_for_text_cls, self.labels_for_text_cls = self.txt_features_for_text_cls()
         self.text_features = self.txt_features()
-        # self.class_desc_emb = self.gen_emb()
+        self.class_desc_emb = self.gen_emb()
         
     def train_txt_clas(self, criteria):
         noise_std = 0.1
@@ -216,10 +216,10 @@ class LaFTerUFT(nn.Module):
         # Iterate over each group and create tensors for the "other" tensor
         for indices in group_indices_split:
             subset_other_tensor = self.txt_features_for_text_cls[group_indices == indices[0]]  # Assuming group indices are consistent
-            group_list.append(subset_other_tensor)
+            group_list.append(subset_other_tensor.mean(axis=0))
 
         # Stack the tensors to create a tensor of shape (num_groups, group_dim, emb_dim)
-        other_tensor_split = torch.stack(group_list).mean(axis=1)
+        other_tensor_split = torch.stack(group_list)
 
         return other_tensor_split.T
 

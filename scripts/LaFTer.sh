@@ -2,7 +2,7 @@
 # custom config
 DATA=data
 TRAINER=LaFTer
-CFG=GeoRSCLIP #'GeoRSCLIP' or 'vit_b32' or 'RemoteCLIP' or 'EVA02_CLIP_B_psz16_s8B'
+CFG=GeoRSCLIP #'vit_b32' or 'GeoRSCLIP' or 'RemoteCLIP' or 'EVA02_CLIP_B_psz16_s8B'
 dset="$1"
 txt_cls=lafter
 nos_epochs=50
@@ -12,12 +12,14 @@ CUDA_VISIBLE_DEVICES=0 python LaFTer.py \
 --trainer ${TRAINER} \
 --dataset-config-file configs/datasets/"${dset}".yaml \
 --config-file configs/trainers/text_cls/${CFG}.yaml \
---output-dir output_1-16/${TRAINER}/${CFG}/"${dset}"_"${nos_epochs}"/"${bws}_LN_Frozen" \
+--output-dir output_and_pl1-avg_and_ln_frozen/${TRAINER}/${CFG}/"${dset}"_"${nos_epochs}"/"${bws}" \
 --lr 0.0005 \
 --epochs ${nos_epochs} \
 --txt_cls ${txt_cls} \
 --batch_size 50 \
 --bws ${bws} \
+--ln_frozen
+# --desc_emb
 # --text_only
 # --desc_noise 0.1
 # --text_only
