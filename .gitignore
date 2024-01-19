@@ -8,7 +8,9 @@ test/
 test*/
 .nfs*
 configs/trainers/text_cls/*
-
+svl_adapter_models/*
+final_output/
+scripts/lafter_pl1.sh
 embeddings/
 
 # Python specific

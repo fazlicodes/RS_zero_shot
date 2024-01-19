@@ -173,26 +173,26 @@ class LaFTerUFT(nn.Module):
 
             Path(f'embeddings').mkdir(parents=True, exist_ok=True)
 
-            if os.path.isfile(f'embeddings/{self.txt_cls}_{self.dataset_name}_embeddings.pt'):
-                zeroshot_weights = torch.load(f'embeddings/{self.txt_cls}_{self.dataset_name}_embeddings.pt')
-                print('******** Loaded Already Saved Embeddings *********')
-                labels_for_descriptions = torch.tensor(labels_for_descriptions).cuda()
+            # if os.path.isfile(f'embeddings/{self.txt_cls}_{self.dataset_name}_embeddings.pt'):
+            #     zeroshot_weights = torch.load(f'embeddings/{self.txt_cls}_{self.dataset_name}_embeddings.pt')
+            #     print('******** Loaded Already Saved Embeddings *********')
+            #     labels_for_descriptions = torch.tensor(labels_for_descriptions).cuda()
 
-            else:
-                print('******** No Embeddings Found --- Saving New Embeddings *********')
+            # else:
+            print('******** No Embeddings Found --- Saving New Embeddings *********')
 
-                labels_for_descriptions = torch.tensor(labels_for_descriptions).cuda()
+            labels_for_descriptions = torch.tensor(labels_for_descriptions).cuda()
 
-                zeroshot_weights = []
-                with torch.no_grad():
-                    for classname in tqdm(desc):
-                        text = tokenize(classname).cuda()  # tokenize # (50, 77) --> 50 templates/texts from GPT
-                        class_embeddings = self.model.encode_text(
-                            text)  # embed with text encoder # (50, 512) --> embeddings for all 50 texts
-                        class_embeddings /= class_embeddings.norm(dim=-1, keepdim=True)  # L2 norm of the embeddings (dim 2)
-                        zeroshot_weights.append(class_embeddings)
-                    zeroshot_weights = torch.stack(zeroshot_weights).cuda()  # (512, 10) --> 512 embeddings for 10 classes'
-                    # torch.save(zeroshot_weights, f'embeddings/{self.txt_cls}_{self.dataset_name}_embeddings.pt')
+            zeroshot_weights = []
+            with torch.no_grad():
+                for classname in tqdm(desc):
+                    text = tokenize(classname).cuda()  # tokenize # (50, 77) --> 50 templates/texts from GPT
+                    class_embeddings = self.model.encode_text(
+                        text)  # embed with text encoder # (50, 512) --> embeddings for all 50 texts
+                    class_embeddings /= class_embeddings.norm(dim=-1, keepdim=True)  # L2 norm of the embeddings (dim 2)
+                    zeroshot_weights.append(class_embeddings)
+                zeroshot_weights = torch.stack(zeroshot_weights).cuda()  # (512, 10) --> 512 embeddings for 10 classes'
+                # torch.save(zeroshot_weights, f'embeddings/{self.txt_cls}_{self.dataset_name}_embeddings.pt')
 
             return zeroshot_weights.squeeze(), labels_for_descriptions
 
@@ -220,10 +220,10 @@ class LaFTerUFT(nn.Module):
         # Iterate over each group and create tensors for the "other" tensor
         for indices in group_indices_split:
             subset_other_tensor = self.txt_features_for_text_cls[group_indices == indices[0]]  # Assuming group indices are consistent
-            group_list.append(subset_other_tensor)
+            group_list.append(subset_other_tensor.mean(axis=0))
 
         # Stack the tensors to create a tensor of shape (num_groups, group_dim, emb_dim)
-        other_tensor_split = torch.stack(group_list).mean(axis=1)
+        other_tensor_split = torch.stack(group_list)
 
         return other_tensor_split.T
 
@@ -264,7 +264,7 @@ class LaFTerUFT(nn.Module):
     def forward_pl_zeroshot(self, x):
         with torch.no_grad():
             if self.cfg.ve_unshared:
-                print('******** Unsharing Vision Encoders *********')
+                # print('******** Unsharing Vision Encoders *********')
                 img_features = self.image_features_frozen_pl(x)
             else:
                 img_features = self.image_features(x)
@@ -301,8 +301,8 @@ class LaFTerUFT(nn.Module):
         self.svl_enc = EmbModel(base_encoder=resnet50, args={'pretrained': True, 'projection_dim': 128, 'num_train': 1000, 'device': 'cuda', 'store_embeddings': False}).to(self.device)
         self.svl_adapter = AdapterMLP(num_classes=len(self.classes), input_size=2048, hidden_size=256).to(self.device)
         # breakpoint()
-        svl_enc_apth = args.svl_model_path + '/eurosat_resnet50_simclr_2024_01_07__17_03_13.pt'
-        svl_adapter_path = args.svl_model_path + '/adapter.pt'
+        svl_enc_apth = args.svl_model_path +'/'+args.dataset +f'/{args.dataset}_pretrained_encoder.pt'
+        svl_adapter_path = args.svl_model_path +'/'+args.dataset + f'/{args.dataset}_adapter.pt'
         # breakpoint()
         checkpoint_enc = torch.load(svl_enc_apth)
         checkpoint_adapter = torch.load(svl_adapter_path)

@@ -1,4 +1,5 @@
 import argparse
+import numpy as np
 import torch
 import pandas as pd
 import datetime
@@ -130,6 +131,16 @@ def setup_cfg(args):
 
     return cfg
 
+def start_seed():
+    seed = args.seed
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+
 
 class lossmeter:
     """Compute and store the average and current value.
@@ -222,10 +233,11 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
     optimizer, scheduler, criteria = setup_lafter_training_utils(args, model)
 
     if args.ve_unshared:
+        print("making ve unshared----------------")
         for param in model.image_features_frozen.parameters(): 
             param.requires_grad = False
 
-    if args.pl_technique=="pl_svl" or args.pl_technique=="pl_text_svl":
+    if args.pl_technique=="pl_svl" or args.pl_technique=="pl_text_svl"  or args.pl_technique=="svl_only":
         #  initialize the svl adapter
         model.svl_adapter_init(args=args)
     
@@ -235,11 +247,11 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
         for param in model.model.parameters():
             param.requires_grad = False
     
-    # Print learnable parameters
-    print('<<<<<<<<<<<<<<<<<<<<<<Learnable Parameters>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-    for name, param in model.model.named_parameters():
-        if param.requires_grad:
-            print(name)
+    # # Print learnable parameters
+    # print('<<<<<<<<<<<<<<<<<<<<<<Learnable Parameters>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    # for name, param in model.model.named_parameters():
+    #     if param.requires_grad:
+    #         print(name)
 
     batch_time = lossmeter()
     data_time = lossmeter()
@@ -250,7 +262,7 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
 
     # Initialize early stopping parameters
     early_stopping_counter = 0
-    early_stopping_threshold = 30
+    early_stopping_threshold = 15
 
     for epoch in range(args.epochs):
         print(f'Epoch: {epoch}')
@@ -264,9 +276,9 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
         pl_svl_acc = lossmeter()
         total_loss = lossmeter()
 
-        print("-------------------------------------")
-        print(args.bws)
-        print("-------------------------------------")
+        # print("-------------------------------------")
+        # print(args.bws)
+        # print("-------------------------------------")
 
         for i, batch in enumerate((tr_loader)):
             data_time.update(time.time() - end)
@@ -344,12 +356,12 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
                         # Combine the tensors along a new dimension (e.g., concatenate along a new dimension)
                         combined_tensor = torch.stack([output_text, output_svl], dim=2)
                         # Average along the new dimension
-                        average_tensor = torch.mean(combined_tensor, dim=2)
-                        pseudo_label_text = F.softmax(average_tensor, dim=1)
+                        pseudo_label_pre_softmax = torch.mean(combined_tensor, dim=2)
+                        pseudo_label_text = F.softmax(pseudo_label_pre_softmax, dim=1)
                         pseudo_label_text = pseudo_label_text.argmax(dim=1)
                         # Ensure pseudo_label_text is 1D or flatten it
                         if pseudo_label_text.dim() > 1:
-                            pseudo_label_text = pseudo_label_text.view(-1)
+                            pseudo_label = pseudo_label_text.view(-1)
 
                     elif args.bws=="conf_alpha":
                         # BWS Computation: Alpha = softmax(concat(pl_zs,pl_text))
@@ -359,7 +371,7 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
                         pseudo_label_pre_softmax = (output_text*alpha[:, 0].unsqueeze(1) +  output_svl*alpha[:, 1].unsqueeze(1))
                         pseudo_label_conf_alpha = torch.flatten(F.softmax(pseudo_label_pre_softmax, dim=-1).argmax(dim=1, keepdim=True))
                         #Change later
-                        pseudo_label_text = pseudo_label_conf_alpha
+                        pseudo_label = pseudo_label_conf_alpha
                         
                     else:
                         raise NotImplementedError
@@ -381,25 +393,35 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
                         # Combine the tensors along a new dimension (e.g., concatenate along a new dimension)
                         combined_tensor = torch.stack([output_zs, output_text, output_svl], dim=2)
                         # Average along the new dimension
-                        average_tensor = torch.mean(combined_tensor, dim=2)
-                        pseudo_label_text = F.softmax(average_tensor, dim=1)
+                        pseudo_label_pre_softmax = torch.mean(combined_tensor, dim=2)
+                        pseudo_label_text = F.softmax(pseudo_label_pre_softmax, dim=1)
                         pseudo_label_text = pseudo_label_text.argmax(dim=1)
                         # Ensure pseudo_label_text is 1D or flatten it
                         if pseudo_label_text.dim() > 1:
-                            pseudo_label_text = pseudo_label_text.view(-1)
+                            pseudo_label = pseudo_label_text.view(-1)
 
                     elif args.bws=="conf_alpha":
                         # BWS Computation: Alpha = softmax(concat(pl_zs,pl_text))
                         alpha = torch.cat([torch.max(F.softmax(output_zs),dim=1)[0].unsqueeze(1),torch.max(F.softmax(output_text),dim=1)[0].unsqueeze(1),torch.max(F.softmax(output_svl),dim=1)[0].unsqueeze(1)], dim=-1)
                         alpha = F.softmax(alpha, dim=-1)
                         # New Psuedo Label
-                        pl_new = (output_zs*alpha[:, 0].unsqueeze(1) +  output_text*alpha[:, 1].unsqueeze(1) + output_svl*alpha[:, 2].unsqueeze(1))
-                        pl_new = torch.flatten(F.softmax(pl_new, dim=-1).argmax(dim=1, keepdim=True))
+                        pseudo_label_pre_softmax = (output_zs*alpha[:, 0].unsqueeze(1) +  output_text*alpha[:, 1].unsqueeze(1) + output_svl*alpha[:, 2].unsqueeze(1))
+                        pl_new = torch.flatten(F.softmax(pseudo_label_pre_softmax, dim=-1).argmax(dim=1, keepdim=True))
                         #Change later
-                        pseudo_label_text = pl_new 
+                        pseudo_label = pl_new 
 
                     else:
                         raise NotImplementedError
+
+                elif args.pl_technique=="svl_only":
+                    with torch.no_grad():
+                        output_svl = model.forward_svl(input[0])
+                        pseudo_label_pre_softmax = output_svl
+                        pseudo_label_svl = F.softmax(output_svl, dim=-1).argmax(dim=1, keepdim=True)
+                        pseudo_label_svl = pseudo_label_svl.flatten().cuda()
+                        pl_svl_acc.update((pseudo_label_svl == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
+                        pseudo_label = pseudo_label_svl
+
                 
                 else:
                     raise NotImplementedError
@@ -409,7 +431,7 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
             elif args.loss_fn=="distill":
                 loss = criteria(out.squeeze(), pseudo_label_pre_softmax)    
             total_loss.update(loss.item(),len(tr_loader))
-            total_loss.update(loss.item(),len(tr_loader))
+            # total_loss.update(loss.item(),len(tr_loader))
 
             if i % args.print_freq == 0:
                 print(
@@ -436,8 +458,8 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
         print(f'TOP-1 Accuracy: {val_acc}')
         all_acc.append(val_acc)
 
-        ps_text_acc=pl_text_acc.avg
-        ps_zs_acc=pl_zs_acc.avg
+        # ps_text_acc=pl_text_acc.avg
+        # ps_zs_acc=pl_zs_acc.avg
 
         print(f'Pseudo Label Text Accuracy: {pl_text_acc.avg}')
         print(f'Pseudo Label Zero Shot Accuracy: {pl_zs_acc.avg}')
@@ -460,7 +482,7 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
         else:
             early_stopping_counter += 1
 
-        df_to_append.append([epoch, ps_text_acc, ps_zs_acc, total_loss.avg, val_acc, best_test_acc, best_val_acc])
+        # df_to_append.append([epoch, ps_text_acc, ps_zs_acc, total_loss.avg, val_acc, best_test_acc, best_val_acc])
         print("Output directory ",args.output_dir)
 
         if early_stopping_counter >= early_stopping_threshold:
@@ -473,6 +495,7 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
     print(f'-------------------------------- Best Validation Accuracy Epoch: {all_acc.index(max(all_acc))} --------------------------------')
     
 def main(args):
+    start_seed()
     cfg = setup_cfg(args)
     cfg.DATALOADER.TRAIN_X.BATCH_SIZE = args.batch_size
     cfg.DATALOADER.TEST.BATCH_SIZE = args.batch_size
@@ -485,6 +508,9 @@ def main(args):
         print("Setting fixed seed: {}".format(cfg.SEED))
         set_random_seed(cfg.SEED)
     setup_logger(cfg.OUTPUT_DIR)
+    print("BWS----------",args.bws)
+    print("PL_TECHNIQUE----------",args.pl_technique)
+    print("DATASET----------",args.dataset)
     print_args(args, cfg)
     if torch.cuda.is_available() and cfg.USE_CUDA:
         torch.backends.cudnn.benchmark = True
@@ -597,7 +623,8 @@ if __name__ == "__main__":
     parser.add_argument('--desc_emb', action="store_true")
     # parser.add_argument('--svl_pl', action="store_true")
     parser.add_argument('--svl_model_path', type=str, default=None)
-    parser.add_argument('--pl_technique', type=str, default='None', choices=['None', 'pl_text', 'pl_svl', 'pl_text_svl'])
+    parser.add_argument('--pl_technique', type=str, default='None', choices=['None','pl_text', 'pl_svl', 'pl_text_svl','svl_only'])
+    parser.add_argument('--dataset',type=str, required=True)
     args = parser.parse_args()
     args.mile_stones = None
     
