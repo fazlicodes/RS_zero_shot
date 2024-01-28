@@ -109,6 +109,11 @@ class LaFTerUFT(nn.Module):
         val = math.sqrt(6. / float(3 * reduce(mul, patch_size, 1) + prompt_dim))  # noqa
         self.prompt_dropout = Dropout(0.0)
         self.adapter = nn.Sequential(nn.Linear(int(self.backbone_out_size), len(classes), bias=False)).to(device)
+        self.vision_adapter = nn.Sequential(
+            nn.Linear(int(self.backbone_out_size), 1024),
+            nn.ReLU(),
+            nn.Linear(1024, int(self.backbone_out_size))
+        ).to(device)
         self.prompt_embeddings = nn.Parameter(torch.zeros(
             1, self.num_tokens, self.hidden_size), requires_grad=True)
         nn.init.uniform_(self.prompt_embeddings.data, -val, val)
@@ -283,7 +288,9 @@ class LaFTerUFT(nn.Module):
         '''
         img_features_2 = self.incorporate_prompt(x2)
         img_features_2 = self.embeddings_after_prompts(img_features_2)
-        img_features_adapter = self.adapter(img_features_2)
+        # breakpoint()
+        img_features_adapter = self.vision_adapter(img_features_2)
+        img_features_adapter = self.adapter(img_features_adapter)
         return img_features_adapter
 
     def txt_cls_init(self):
@@ -298,30 +305,59 @@ class LaFTerUFT(nn.Module):
 
     def svl_adapter_init(self, args):
 
-        self.svl_enc = EmbModel(base_encoder=resnet50, args={'pretrained': True, 'projection_dim': 128, 'num_train': 1000, 'device': 'cuda', 'store_embeddings': False}).to(self.device)
-        self.svl_adapter = AdapterMLP(num_classes=len(self.classes), input_size=2048, hidden_size=256).to(self.device)
+        if not args.vision_adapter:
+            self.svl_enc = EmbModel(base_encoder=resnet50, args={'pretrained': True, 'projection_dim': 128, 'num_train': 1000, 'device': 'cuda', 'store_embeddings': False}).to(self.device)
+            svl_enc_apth = args.svl_model_path +'/'+args.dataset +f'/{args.dataset}_pretrained_encoder.pt'
+            checkpoint_enc = torch.load(svl_enc_apth)
+            self.svl_enc.load_state_dict(checkpoint_enc['state_dict'])
+            in_features = self.svl_enc.encoder.fc.in_features
+            # freeze svl_enc and adapter
+            for param in self.svl_enc.parameters():
+                param.requires_grad = False
+        else:
+            in_features = self.model.visual.output_dim
+
+        self.svl_adapter = AdapterMLP(num_classes=len(self.classes), input_size=in_features, hidden_size=256).to(self.device)
         # breakpoint()
-        svl_enc_apth = args.svl_model_path +'/'+args.dataset +f'/{args.dataset}_pretrained_encoder.pt'
-        svl_adapter_path = args.svl_model_path +'/'+args.dataset + f'/{args.dataset}_adapter.pt'
-        # breakpoint()
-        checkpoint_enc = torch.load(svl_enc_apth)
+        if args.configuration == 'vit_b32':
+            svl_adapter_path = args.svl_model_path +'/'+args.dataset + f'/clip_{args.dataset}_adapter.pt'
+        elif args.configuration == 'GeoRSCLIP':
+            svl_adapter_path = args.svl_model_path +'/'+args.dataset + f'/{args.dataset}_adapter.pt'
+        elif args.configuration == 'GeoRSCLIP_adapter':
+            svl_adapter_path = args.svl_model_path +'/'+args.dataset + f'/GeoRSCLIP_{args.dataset}_adapter.pt'
+        else:
+            raise ValueError('Invalid configuration')
+
         checkpoint_adapter = torch.load(svl_adapter_path)
-
-        self.svl_enc.load_state_dict(checkpoint_enc['state_dict'])
         self.svl_adapter.load_state_dict(checkpoint_adapter) 
-
-        # freeze svl_enc and adapter
-        for param in self.svl_enc.parameters():
-            param.requires_grad = False
 
         for param in self.svl_adapter.parameters():
             param.requires_grad = False 
+
+    def init_vision_adapter(self):
+        # self.vision_adapter = nn.Sequential(
+        #     nn.Linear(int(self.backbone_out_size), 1024),
+        #     nn.ReLU(),
+        #     nn.Linear(1024, int(self.backbone_out_size))
+        # )
+        # init weights
+        self.vision_adapter.apply(weights_init)
+        # freeze text classifier
+        for param in self.adapter.parameters():
+            param.requires_grad = False
+        
 
     def forward_svl(self, x):
         # with torch.no_grad():
         op = self.svl_enc(x, only_feats=True)
         op = self.svl_adapter(op['feat'])
         return op
+    
+    def forward_vision_adapter(self, x):
+        op = self.image_features(x)
+        op = self.svl_adapter(op)
+        return op
+        
 
     def image_features_frozen_pl(self, images):
         with torch.no_grad():

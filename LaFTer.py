@@ -237,7 +237,7 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
         for param in model.image_features_frozen.parameters(): 
             param.requires_grad = False
 
-    if args.pl_technique=="pl_svl" or args.pl_technique=="pl_text_svl"  or args.pl_technique=="svl_only":
+    if args.pl_technique=="pl_svl" or args.pl_technique=="pl_text_svl"  or args.pl_technique=="svl_only" or args.pl_technique=="vision_adapter":
         #  initialize the svl adapter
         model.svl_adapter_init(args=args)
     
@@ -252,6 +252,8 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
     # for name, param in model.model.named_parameters():
     #     if param.requires_grad:
     #         print(name)
+            
+    model.init_vision_adapter()
 
     batch_time = lossmeter()
     data_time = lossmeter()
@@ -262,7 +264,7 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
 
     # Initialize early stopping parameters
     early_stopping_counter = 0
-    early_stopping_threshold = 15
+    early_stopping_threshold = 50
 
     for epoch in range(args.epochs):
         print(f'Epoch: {epoch}')
@@ -274,11 +276,11 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
         pl_text_acc = lossmeter()
         pl_zs_acc = lossmeter()
         pl_svl_acc = lossmeter()
+        pl_vision_adapter_acc = lossmeter()
         total_loss = lossmeter()
 
-        # print("-------------------------------------")
-        # print(args.bws)
-        # print("-------------------------------------")
+        zs_conf=lossmeter()
+        text_conf=lossmeter()
 
         for i, batch in enumerate((tr_loader)):
             data_time.update(time.time() - end)
@@ -295,6 +297,11 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
             out = model.forward_aug_with_prompts(input[1].float().cuda())
 
             pseudo_label = F.softmax(output_text, dim=-1)  # / 0.04
+
+            text_max_confs = pseudo_label.max(dim=1).values.float()
+            text_average_conf = torch.mean(text_max_confs)
+            text_conf.update(text_average_conf.item(), len(batch["label"]))
+            
             pseudo_label = pseudo_label.argmax(dim=1, keepdim=True)
             pseudo_label = pseudo_label.flatten().cuda()
             pl_text_acc.update((pseudo_label == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
@@ -306,7 +313,13 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
                     # Get Pseudo Label from Zero-Shot
                     with torch.no_grad():
                         output_zs = model.forward_pl_zeroshot(input[0])
-                        pseudo_label_zero_shot = F.softmax(output_zs, dim=-1).argmax(dim=1, keepdim=True)
+                        pseudo_label_zero_shot = F.softmax(output_zs, dim=-1)
+
+                        zs_max_confs = pseudo_label_zero_shot.max(dim=1).values.float()
+                        zs_average_conf = torch.mean(zs_max_confs)
+                        zs_conf.update(zs_average_conf.item(), len(batch["label"]))
+
+                        pseudo_label_zero_shot = pseudo_label_zero_shot.argmax(dim=1, keepdim=True)
                         pseudo_label_zero_shot = pseudo_label_zero_shot.flatten().cuda()
                         pl_zs_acc.update((pseudo_label_zero_shot == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
 
@@ -422,6 +435,25 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
                         pl_svl_acc.update((pseudo_label_svl == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
                         pseudo_label = pseudo_label_svl
 
+                elif args.pl_technique=="vision_adapter":
+                    with torch.no_grad():
+                        output_vision_adapter = model.forward_vision_adapter(input[0])
+                        pseudo_label_pre_softmax = output_vision_adapter
+                        pseudo_label_vision_adapter = F.softmax(output_vision_adapter, dim=-1).argmax(dim=1, keepdim=True)
+                        pseudo_label_vision_adapter = pseudo_label_vision_adapter.flatten().cuda()
+                        pl_vision_adapter_acc.update((pseudo_label_vision_adapter == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
+                        pseudo_label = pseudo_label_vision_adapter
+
+                    if args.bws=="avg":
+                        # Combine the tensors along a new dimension (e.g., concatenate along a new dimension)
+                        combined_tensor = torch.stack([output_text, output_vision_adapter], dim=2)
+                        # Average along the new dimension
+                        pseudo_label_pre_softmax = torch.mean(combined_tensor, dim=2)
+                        pseudo_label_text = F.softmax(pseudo_label_pre_softmax, dim=1)
+                        pseudo_label_text = pseudo_label_text.argmax(dim=1)
+                        # Ensure pseudo_label_text is 1D or flatten it
+                        if pseudo_label_text.dim() > 1:
+                            pseudo_label = pseudo_label_text.view(-1)
                 
                 else:
                     raise NotImplementedError
@@ -450,6 +482,8 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
             optimizer.step()
         scheduler.step()
         
+        print(f'Text classifier average confiderence: {text_conf.avg}')
+        print(f'Zero shot average confiderence: {zs_conf.avg}')
         
         print(f'Epoch Loss: {total_loss.avg}')
 
@@ -464,6 +498,7 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
         print(f'Pseudo Label Text Accuracy: {pl_text_acc.avg}')
         print(f'Pseudo Label Zero Shot Accuracy: {pl_zs_acc.avg}')
         print(f'Pseudo Label SVL Accuracy: {pl_svl_acc.avg}')
+        print(f'Pseudo Label Vision Adapter Accuracy: {pl_vision_adapter_acc.avg}')
 
         best_test_acc=None
         if val_acc>best_acc:
@@ -495,7 +530,6 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
     print(f'-------------------------------- Best Validation Accuracy Epoch: {all_acc.index(max(all_acc))} --------------------------------')
     
 def main(args):
-    start_seed()
     cfg = setup_cfg(args)
     cfg.DATALOADER.TRAIN_X.BATCH_SIZE = args.batch_size
     cfg.DATALOADER.TEST.BATCH_SIZE = args.batch_size
@@ -623,8 +657,10 @@ if __name__ == "__main__":
     parser.add_argument('--desc_emb', action="store_true")
     # parser.add_argument('--svl_pl', action="store_true")
     parser.add_argument('--svl_model_path', type=str, default=None)
-    parser.add_argument('--pl_technique', type=str, default='None', choices=['None','pl_text', 'pl_svl', 'pl_text_svl','svl_only'])
+    parser.add_argument('--pl_technique', type=str, default='None', choices=['None','pl_text', 'pl_svl', 'pl_text_svl','svl_only','vision_adapter'])
     parser.add_argument('--dataset',type=str, required=True)
+    parser.add_argument('--configuration',type=str, required=True, choices=['GeoRSCLIP', 'vit_b32','GeoRSCLIP_adapter'])
+    parser.add_argument('--vision_adapter', action="store_true")
     args = parser.parse_args()
     args.mile_stones = None
     

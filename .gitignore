@@ -12,7 +12,13 @@ svl_adapter_models/*
 final_output/
 scripts/lafter_pl1.sh
 embeddings/
-
+descriptions/*/*
+final_output*/
+slurm-logs/
+submit.sh
+ssl_models/*
+scripts/*
+unshared_pl1_avg.sh
 # Python specific
 *.pyc
 *.pyo
