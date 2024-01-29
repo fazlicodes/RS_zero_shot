@@ -303,22 +303,23 @@ class LaFTerUFT(nn.Module):
         if self.cfg.ve_unshared:
             self.image_features_frozen = copy.deepcopy(self.model.visual)
 
-    def svl_adapter_init(self, args):
-
-        if not args.vision_adapter:
-            self.svl_enc = EmbModel(base_encoder=resnet50, args={'pretrained': True, 'projection_dim': 128, 'num_train': 1000, 'device': 'cuda', 'store_embeddings': False}).to(self.device)
-            svl_enc_apth = args.svl_model_path +'/'+args.dataset +f'/{args.dataset}_pretrained_encoder.pt'
-            checkpoint_enc = torch.load(svl_enc_apth)
-            self.svl_enc.load_state_dict(checkpoint_enc['state_dict'])
-            in_features = self.svl_enc.encoder.fc.in_features
-            # freeze svl_enc and adapter
-            for param in self.svl_enc.parameters():
-                param.requires_grad = False
-        else:
+    def ssl_encoder_init(self, args):
+        self.svl_enc = EmbModel(base_encoder=resnet50, args={'pretrained': True, 'projection_dim': 512, 'num_train': 1000, 'device': 'cuda', 'store_embeddings': False}).to(self.device)
+        # svl_enc_path = args.svl_model_path +'/'+args.dataset +f'/{args.dataset}_pretrained_encoder.pt'
+        svl_enc_path = args.svl_model_path +'/'+args.dataset +f'/{args.dataset}_resnet50_georsclip.pt'
+        checkpoint_enc = torch.load(svl_enc_path)
+        self.svl_enc.load_state_dict(checkpoint_enc['state_dict'], strict=False)
+        # freeze svl_enc
+        for param in self.svl_enc.parameters():
+            param.requires_grad = False
+        
+    def ssl_adapter_init(self, args):
+        if self.svl_enc is None:
             in_features = self.model.visual.output_dim
-
+        else:
+            in_features = self.svl_enc.encoder.fc.in_features
         self.svl_adapter = AdapterMLP(num_classes=len(self.classes), input_size=in_features, hidden_size=256).to(self.device)
-        # breakpoint()
+
         if args.configuration == 'vit_b32':
             svl_adapter_path = args.svl_model_path +'/'+args.dataset + f'/clip_{args.dataset}_adapter.pt'
         elif args.configuration == 'GeoRSCLIP':
@@ -327,12 +328,18 @@ class LaFTerUFT(nn.Module):
             svl_adapter_path = args.svl_model_path +'/'+args.dataset + f'/GeoRSCLIP_{args.dataset}_adapter.pt'
         else:
             raise ValueError('Invalid configuration')
-
+        
         checkpoint_adapter = torch.load(svl_adapter_path)
         self.svl_adapter.load_state_dict(checkpoint_adapter) 
 
         for param in self.svl_adapter.parameters():
-            param.requires_grad = False 
+            param.requires_grad = False
+
+    def forward_ssl_encoder_only(self, x):
+        op = self.svl_enc(x, only_feats=False)
+        pseudo_label = self.adapter_pl(op['emb'].float()).detach()
+        return pseudo_label
+
 
     def init_vision_adapter(self):
         # self.vision_adapter = nn.Sequential(

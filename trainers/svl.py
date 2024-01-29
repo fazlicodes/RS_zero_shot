@@ -13,7 +13,7 @@ class EmbModel(nn.Module):
         self.enc = base_encoder(pretrained=args['pretrained'])
         self.feature_dim = self.enc.fc.in_features
         self.projection_dim = args['projection_dim'] 
-        self.proj_hidden = 512
+        self.proj_hidden = 1024
 
         # remove final fully connected layer of the backbone
         self.enc.fc = nn.Identity()  

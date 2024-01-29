@@ -237,10 +237,17 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
         for param in model.image_features_frozen.parameters(): 
             param.requires_grad = False
 
-    if args.pl_technique=="pl_svl" or args.pl_technique=="pl_text_svl"  or args.pl_technique=="svl_only" or args.pl_technique=="vision_adapter":
-        #  initialize the svl adapter
-        model.svl_adapter_init(args=args)
-    
+    if args.pl_technique=="pl_svl" or args.pl_technique=="pl_text_svl"  or args.pl_technique=="svl_only": 
+        model.ssl_encoder_init(args=args)
+        model.ssl_adapter_init(args=args)
+    elif args.pl_technique=="vision_adapter":
+        model.vision_adapter_init(args=args)
+    elif args.pl_technique=="ssl_encoder_only":
+        model.ssl_encoder_init(args=args)
+    else:
+        raise NotImplementedError
+
+
     if args.ln_frozen:
         print("------LN Frozen------")
         #Freeze CLIP
@@ -264,7 +271,7 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
 
     # Initialize early stopping parameters
     early_stopping_counter = 0
-    early_stopping_threshold = 50
+    early_stopping_threshold = 25
 
     for epoch in range(args.epochs):
         print(f'Epoch: {epoch}')
@@ -293,7 +300,7 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
             optimizer.zero_grad()
 
             with torch.no_grad():
-                output_text = model.forward_normal_for_pl(input[0])
+                output_text = model.forward_ssl_encoder_only(input[0])
             out = model.forward_aug_with_prompts(input[1].float().cuda())
 
             pseudo_label = F.softmax(output_text, dim=-1)  # / 0.04
@@ -306,162 +313,163 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
             pseudo_label = pseudo_label.flatten().cuda()
             pl_text_acc.update((pseudo_label == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
 
-            if not args.text_only:
-                # clip_conf = output_zs.softmax(dim=-1).max(dim=-1).values.mean().item
+            # if not args.text_only:
+            #     # clip_conf = output_zs.softmax(dim=-1).max(dim=-1).values.mean().item
 
-                if args.pl_technique=="pl_text":
-                    # Get Pseudo Label from Zero-Shot
-                    with torch.no_grad():
-                        output_zs = model.forward_pl_zeroshot(input[0])
-                        pseudo_label_zero_shot = F.softmax(output_zs, dim=-1)
+            #     if args.pl_technique=="pl_text":
+            #         # Get Pseudo Label from Zero-Shot
+            #         with torch.no_grad():
+            #             output_zs = model.forward_pl_zeroshot(input[0])
+            #             pseudo_label_zero_shot = F.softmax(output_zs, dim=-1)
 
-                        zs_max_confs = pseudo_label_zero_shot.max(dim=1).values.float()
-                        zs_average_conf = torch.mean(zs_max_confs)
-                        zs_conf.update(zs_average_conf.item(), len(batch["label"]))
+            #             zs_max_confs = pseudo_label_zero_shot.max(dim=1).values.float()
+            #             zs_average_conf = torch.mean(zs_max_confs)
+            #             zs_conf.update(zs_average_conf.item(), len(batch["label"]))
 
-                        pseudo_label_zero_shot = pseudo_label_zero_shot.argmax(dim=1, keepdim=True)
-                        pseudo_label_zero_shot = pseudo_label_zero_shot.flatten().cuda()
-                        pl_zs_acc.update((pseudo_label_zero_shot == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
+            #             pseudo_label_zero_shot = pseudo_label_zero_shot.argmax(dim=1, keepdim=True)
+            #             pseudo_label_zero_shot = pseudo_label_zero_shot.flatten().cuda()
+            #             pl_zs_acc.update((pseudo_label_zero_shot == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
 
-                    if args.bws=="fixed_alpha":
-                        # Choose a value for alpha in the range [0, 1]
-                        alpha = args.bws.split('_')[-1]
-                        combined_tensor = alpha * output_zs + (1 - alpha) * output_text
-                        pseudo_label_pre_softmax = torch.mean(combined_tensor, dim=1)
-                        pseudo_label_comb  = F.softmax(pseudo_label_pre_softmax, dim=0)
-                        pseudo_label_comb  = pseudo_label_comb .argmax()
-                        if pseudo_label_comb .dim() > 0:
-                            pseudo_label = pseudo_label_comb .view(-1)
+            #         if args.bws=="fixed_alpha":
+            #             # Choose a value for alpha in the range [0, 1]
+            #             alpha = args.bws.split('_')[-1]
+            #             combined_tensor = alpha * output_zs + (1 - alpha) * output_text
+            #             pseudo_label_pre_softmax = torch.mean(combined_tensor, dim=1)
+            #             pseudo_label_comb  = F.softmax(pseudo_label_pre_softmax, dim=0)
+            #             pseudo_label_comb  = pseudo_label_comb .argmax()
+            #             if pseudo_label_comb .dim() > 0:
+            #                 pseudo_label = pseudo_label_comb .view(-1)
 
-                    elif args.bws=="avg":
-                        # Combine the tensors along a new dimension (e.g., concatenate along a new dimension)
-                        combined_tensor = torch.stack([output_zs, output_text], dim=2)
-                        # Average along the new dimension
-                        pseudo_label_pre_softmax = torch.mean(combined_tensor, dim=2)
-                        pseudo_label_comb = F.softmax(pseudo_label_pre_softmax, dim=1)
-                        pseudo_label_comb = pseudo_label_comb.argmax(dim=1)
-                        # Ensure pseudo_label_text is 1D or flatten it
-                        if pseudo_label_comb.dim() > 1:
-                            pseudo_label = pseudo_label_comb.view(-1)
+            #         elif args.bws=="avg":
+            #             # Combine the tensors along a new dimension (e.g., concatenate along a new dimension)
+            #             combined_tensor = torch.stack([output_zs, output_text], dim=2)
+            #             # Average along the new dimension
+            #             pseudo_label_pre_softmax = torch.mean(combined_tensor, dim=2)
+            #             pseudo_label_comb = F.softmax(pseudo_label_pre_softmax, dim=1)
+            #             pseudo_label_comb = pseudo_label_comb.argmax(dim=1)
+            #             # Ensure pseudo_label_text is 1D or flatten it
+            #             if pseudo_label_comb.dim() > 1:
+            #                 pseudo_label = pseudo_label_comb.view(-1)
 
-                    elif args.bws=="conf_alpha":
-                        # BWS Computation: Alpha = softmax(concat(pl_zs,pl_text))
-                        alpha = torch.cat([torch.max(F.softmax(output_zs),dim=1)[0].unsqueeze(1),torch.max(F.softmax(output_text),dim=1)[0].unsqueeze(1)], dim=-1)
-                        alpha = F.softmax(alpha, dim=-1)
-                        # New Psuedo Label
-                        pseudo_label_pre_softmax = (output_zs*alpha[:, 0].unsqueeze(1) +  output_text*alpha[:, 1].unsqueeze(1))
-                        pseudo_label_conf_alpha = torch.flatten(F.softmax(pseudo_label_pre_softmax, dim=-1).argmax(dim=1, keepdim=True))
-                        #Change later
-                        pseudo_label = pseudo_label_conf_alpha
-                    else:
-                        raise NotImplementedError
+            #         elif args.bws=="conf_alpha":
+            #             # BWS Computation: Alpha = softmax(concat(pl_zs,pl_text))
+            #             alpha = torch.cat([torch.max(F.softmax(output_zs),dim=1)[0].unsqueeze(1),torch.max(F.softmax(output_text),dim=1)[0].unsqueeze(1)], dim=-1)
+            #             alpha = F.softmax(alpha, dim=-1)
+            #             # New Psuedo Label
+            #             pseudo_label_pre_softmax = (output_zs*alpha[:, 0].unsqueeze(1) +  output_text*alpha[:, 1].unsqueeze(1))
+            #             pseudo_label_conf_alpha = torch.flatten(F.softmax(pseudo_label_pre_softmax, dim=-1).argmax(dim=1, keepdim=True))
+            #             #Change later
+            #             pseudo_label = pseudo_label_conf_alpha
+            #         else:
+            #             raise NotImplementedError
                     
-                elif args.pl_technique=="pl_svl":
-                    # print (" Get Pseudo Label from SVL")
-                    # Get Pseudo Label from SVL
-                    with torch.no_grad():
-                        output_svl = model.forward_svl(input[0])
-                        pseudo_label_svl = F.softmax(output_svl, dim=-1).argmax(dim=1, keepdim=True)
-                        pseudo_label_svl = pseudo_label_svl.flatten().cuda()
-                        pl_svl_acc.update((pseudo_label_svl == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
+            #     elif args.pl_technique=="pl_svl":
+            #         # print (" Get Pseudo Label from SVL")
+            #         # Get Pseudo Label from SVL
+            #         with torch.no_grad():
+            #             output_svl = model.forward_svl(input[0])
+            #             pseudo_label_svl = F.softmax(output_svl, dim=-1).argmax(dim=1, keepdim=True)
+            #             pseudo_label_svl = pseudo_label_svl.flatten().cuda()
+            #             pl_svl_acc.update((pseudo_label_svl == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
 
-                    if args.bws=="avg":
-                        # Combine the tensors along a new dimension (e.g., concatenate along a new dimension)
-                        combined_tensor = torch.stack([output_text, output_svl], dim=2)
-                        # Average along the new dimension
-                        pseudo_label_pre_softmax = torch.mean(combined_tensor, dim=2)
-                        pseudo_label_text = F.softmax(pseudo_label_pre_softmax, dim=1)
-                        pseudo_label_text = pseudo_label_text.argmax(dim=1)
-                        # Ensure pseudo_label_text is 1D or flatten it
-                        if pseudo_label_text.dim() > 1:
-                            pseudo_label = pseudo_label_text.view(-1)
+            #         if args.bws=="avg":
+            #             # Combine the tensors along a new dimension (e.g., concatenate along a new dimension)
+            #             combined_tensor = torch.stack([output_text, output_svl], dim=2)
+            #             # Average along the new dimension
+            #             pseudo_label_pre_softmax = torch.mean(combined_tensor, dim=2)
+            #             pseudo_label_text = F.softmax(pseudo_label_pre_softmax, dim=1)
+            #             pseudo_label_text = pseudo_label_text.argmax(dim=1)
+            #             # Ensure pseudo_label_text is 1D or flatten it
+            #             if pseudo_label_text.dim() > 1:
+            #                 pseudo_label = pseudo_label_text.view(-1)
 
-                    elif args.bws=="conf_alpha":
-                        # BWS Computation: Alpha = softmax(concat(pl_zs,pl_text))
-                        alpha = torch.cat([torch.max(F.softmax(output_text),dim=1)[0].unsqueeze(1),torch.max(F.softmax(output_svl),dim=1)[0].unsqueeze(1)], dim=-1)
-                        alpha = F.softmax(alpha, dim=-1)
-                        # New Psuedo Label
-                        pseudo_label_pre_softmax = (output_text*alpha[:, 0].unsqueeze(1) +  output_svl*alpha[:, 1].unsqueeze(1))
-                        pseudo_label_conf_alpha = torch.flatten(F.softmax(pseudo_label_pre_softmax, dim=-1).argmax(dim=1, keepdim=True))
-                        #Change later
-                        pseudo_label = pseudo_label_conf_alpha
+            #         elif args.bws=="conf_alpha":
+            #             # BWS Computation: Alpha = softmax(concat(pl_zs,pl_text))
+            #             alpha = torch.cat([torch.max(F.softmax(output_text),dim=1)[0].unsqueeze(1),torch.max(F.softmax(output_svl),dim=1)[0].unsqueeze(1)], dim=-1)
+            #             alpha = F.softmax(alpha, dim=-1)
+            #             # New Psuedo Label
+            #             pseudo_label_pre_softmax = (output_text*alpha[:, 0].unsqueeze(1) +  output_svl*alpha[:, 1].unsqueeze(1))
+            #             pseudo_label_conf_alpha = torch.flatten(F.softmax(pseudo_label_pre_softmax, dim=-1).argmax(dim=1, keepdim=True))
+            #             #Change later
+            #             pseudo_label = pseudo_label_conf_alpha
                         
-                    else:
-                        raise NotImplementedError
+            #         else:
+            #             raise NotImplementedError
                 
-                elif args.pl_technique=="pl_text_svl":
-                    with torch.no_grad():
-                        output_zs = model.forward_pl_zeroshot(input[0])
-                        pseudo_label_zero_shot = F.softmax(output_zs, dim=-1).argmax(dim=1, keepdim=True)
-                        pseudo_label_zero_shot = pseudo_label_zero_shot.flatten().cuda()
-                        pl_zs_acc.update((pseudo_label_zero_shot == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
+            #     elif args.pl_technique=="pl_text_svl":
+            #         with torch.no_grad():
+            #             output_zs = model.forward_pl_zeroshot(input[0])
+            #             pseudo_label_zero_shot = F.softmax(output_zs, dim=-1).argmax(dim=1, keepdim=True)
+            #             pseudo_label_zero_shot = pseudo_label_zero_shot.flatten().cuda()
+            #             pl_zs_acc.update((pseudo_label_zero_shot == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
                     
-                    with torch.no_grad():
-                        output_svl = model.forward_svl(input[0])
-                        pseudo_label_svl = F.softmax(output_svl, dim=-1).argmax(dim=1, keepdim=True)
-                        pseudo_label_svl = pseudo_label_svl.flatten().cuda()
-                        pl_svl_acc.update((pseudo_label_svl == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
+            #         with torch.no_grad():
+            #             output_svl = model.forward_svl(input[0])
+            #             pseudo_label_svl = F.softmax(output_svl, dim=-1).argmax(dim=1, keepdim=True)
+            #             pseudo_label_svl = pseudo_label_svl.flatten().cuda()
+            #             pl_svl_acc.update((pseudo_label_svl == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
 
-                    if args.bws=="avg":
-                        # Combine the tensors along a new dimension (e.g., concatenate along a new dimension)
-                        combined_tensor = torch.stack([output_zs, output_text, output_svl], dim=2)
-                        # Average along the new dimension
-                        pseudo_label_pre_softmax = torch.mean(combined_tensor, dim=2)
-                        pseudo_label_text = F.softmax(pseudo_label_pre_softmax, dim=1)
-                        pseudo_label_text = pseudo_label_text.argmax(dim=1)
-                        # Ensure pseudo_label_text is 1D or flatten it
-                        if pseudo_label_text.dim() > 1:
-                            pseudo_label = pseudo_label_text.view(-1)
+            #         if args.bws=="avg":
+            #             # Combine the tensors along a new dimension (e.g., concatenate along a new dimension)
+            #             combined_tensor = torch.stack([output_zs, output_text, output_svl], dim=2)
+            #             # Average along the new dimension
+            #             pseudo_label_pre_softmax = torch.mean(combined_tensor, dim=2)
+            #             pseudo_label_text = F.softmax(pseudo_label_pre_softmax, dim=1)
+            #             pseudo_label_text = pseudo_label_text.argmax(dim=1)
+            #             # Ensure pseudo_label_text is 1D or flatten it
+            #             if pseudo_label_text.dim() > 1:
+            #                 pseudo_label = pseudo_label_text.view(-1)
 
-                    elif args.bws=="conf_alpha":
-                        # BWS Computation: Alpha = softmax(concat(pl_zs,pl_text))
-                        alpha = torch.cat([torch.max(F.softmax(output_zs),dim=1)[0].unsqueeze(1),torch.max(F.softmax(output_text),dim=1)[0].unsqueeze(1),torch.max(F.softmax(output_svl),dim=1)[0].unsqueeze(1)], dim=-1)
-                        alpha = F.softmax(alpha, dim=-1)
-                        # New Psuedo Label
-                        pseudo_label_pre_softmax = (output_zs*alpha[:, 0].unsqueeze(1) +  output_text*alpha[:, 1].unsqueeze(1) + output_svl*alpha[:, 2].unsqueeze(1))
-                        pl_new = torch.flatten(F.softmax(pseudo_label_pre_softmax, dim=-1).argmax(dim=1, keepdim=True))
-                        #Change later
-                        pseudo_label = pl_new 
+            #         elif args.bws=="conf_alpha":
+            #             # BWS Computation: Alpha = softmax(concat(pl_zs,pl_text))
+            #             alpha = torch.cat([torch.max(F.softmax(output_zs),dim=1)[0].unsqueeze(1),torch.max(F.softmax(output_text),dim=1)[0].unsqueeze(1),torch.max(F.softmax(output_svl),dim=1)[0].unsqueeze(1)], dim=-1)
+            #             alpha = F.softmax(alpha, dim=-1)
+            #             # New Psuedo Label
+            #             pseudo_label_pre_softmax = (output_zs*alpha[:, 0].unsqueeze(1) +  output_text*alpha[:, 1].unsqueeze(1) + output_svl*alpha[:, 2].unsqueeze(1))
+            #             pl_new = torch.flatten(F.softmax(pseudo_label_pre_softmax, dim=-1).argmax(dim=1, keepdim=True))
+            #             #Change later
+            #             pseudo_label = pl_new 
 
-                    else:
-                        raise NotImplementedError
+            #         else:
+            #             raise NotImplementedError
 
-                elif args.pl_technique=="svl_only":
-                    with torch.no_grad():
-                        output_svl = model.forward_svl(input[0])
-                        pseudo_label_pre_softmax = output_svl
-                        pseudo_label_svl = F.softmax(output_svl, dim=-1).argmax(dim=1, keepdim=True)
-                        pseudo_label_svl = pseudo_label_svl.flatten().cuda()
-                        pl_svl_acc.update((pseudo_label_svl == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
-                        pseudo_label = pseudo_label_svl
+            #     elif args.pl_technique=="svl_only":
+            #         with torch.no_grad():
+            #             output_svl = model.forward_svl(input[0])
+            #             pseudo_label_pre_softmax = output_svl
+            #             pseudo_label_svl = F.softmax(output_svl, dim=-1).argmax(dim=1, keepdim=True)
+            #             pseudo_label_svl = pseudo_label_svl.flatten().cuda()
+            #             pl_svl_acc.update((pseudo_label_svl == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
+            #             pseudo_label = pseudo_label_svl
 
-                elif args.pl_technique=="vision_adapter":
-                    with torch.no_grad():
-                        output_vision_adapter = model.forward_vision_adapter(input[0])
-                        pseudo_label_pre_softmax = output_vision_adapter
-                        pseudo_label_vision_adapter = F.softmax(output_vision_adapter, dim=-1).argmax(dim=1, keepdim=True)
-                        pseudo_label_vision_adapter = pseudo_label_vision_adapter.flatten().cuda()
-                        pl_vision_adapter_acc.update((pseudo_label_vision_adapter == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
-                        pseudo_label = pseudo_label_vision_adapter
+            #     elif args.pl_technique=="vision_adapter":
+            #         with torch.no_grad():
+            #             output_vision_adapter = model.forward_vision_adapter(input[0])
+            #             pseudo_label_pre_softmax = output_vision_adapter
+            #             pseudo_label_vision_adapter = F.softmax(output_vision_adapter, dim=-1).argmax(dim=1, keepdim=True)
+            #             pseudo_label_vision_adapter = pseudo_label_vision_adapter.flatten().cuda()
+            #             pl_vision_adapter_acc.update((pseudo_label_vision_adapter == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
+            #             pseudo_label = pseudo_label_vision_adapter
 
-                    if args.bws=="avg":
-                        # Combine the tensors along a new dimension (e.g., concatenate along a new dimension)
-                        combined_tensor = torch.stack([output_text, output_vision_adapter], dim=2)
-                        # Average along the new dimension
-                        pseudo_label_pre_softmax = torch.mean(combined_tensor, dim=2)
-                        pseudo_label_text = F.softmax(pseudo_label_pre_softmax, dim=1)
-                        pseudo_label_text = pseudo_label_text.argmax(dim=1)
-                        # Ensure pseudo_label_text is 1D or flatten it
-                        if pseudo_label_text.dim() > 1:
-                            pseudo_label = pseudo_label_text.view(-1)
+            #         if args.bws=="avg":
+            #             # Combine the tensors along a new dimension (e.g., concatenate along a new dimension)
+            #             combined_tensor = torch.stack([output_text, output_vision_adapter], dim=2)
+            #             # Average along the new dimension
+            #             pseudo_label_pre_softmax = torch.mean(combined_tensor, dim=2)
+            #             pseudo_label_text = F.softmax(pseudo_label_pre_softmax, dim=1)
+            #             pseudo_label_text = pseudo_label_text.argmax(dim=1)
+            #             # Ensure pseudo_label_text is 1D or flatten it
+            #             if pseudo_label_text.dim() > 1:
+            #                 pseudo_label = pseudo_label_text.view(-1)
                 
-                else:
-                    raise NotImplementedError
+            #     else:
+            #         raise NotImplementedError
         
             if args.loss_fn=="crossentropy":
                 loss = criteria(out.squeeze(), pseudo_label)
             elif args.loss_fn=="distill":
-                loss = criteria(out.squeeze(), pseudo_label_pre_softmax)    
+                pass
+                # loss = criteria(out.squeeze(), pseudo_label_pre_softmax)    
             total_loss.update(loss.item(),len(tr_loader))
             # total_loss.update(loss.item(),len(tr_loader))
 
@@ -657,7 +665,7 @@ if __name__ == "__main__":
     parser.add_argument('--desc_emb', action="store_true")
     # parser.add_argument('--svl_pl', action="store_true")
     parser.add_argument('--svl_model_path', type=str, default=None)
-    parser.add_argument('--pl_technique', type=str, default='None', choices=['None','pl_text', 'pl_svl', 'pl_text_svl','svl_only','vision_adapter'])
+    parser.add_argument('--pl_technique', type=str, default='None', choices=['None','pl_text', 'pl_svl', 'pl_text_svl','svl_only','vision_adapter','ssl_encoder_only'])
     parser.add_argument('--dataset',type=str, required=True)
     parser.add_argument('--configuration',type=str, required=True, choices=['GeoRSCLIP', 'vit_b32','GeoRSCLIP_adapter'])
     parser.add_argument('--vision_adapter', action="store_true")
