@@ -217,17 +217,18 @@ def test(args, teloader, model):
 def train_txt_cls(args, model):
     optimizer, _, _ = setup_text_training_utils(args, model)
     criteria = torch.nn.CrossEntropyLoss(label_smoothing=0.1)
+    with
     for i in tqdm(range(args.txt_epochs)):
         loss = model.train_txt_clas(criteria)
         optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+        # loss.backward()
+        # optimizer.step()
     model.txt_cls_init()
 
 def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
 
     # first train text classifier
-    train_txt_cls(args, model)
+    # train_txt_cls(args, model)
 
     all_acc = list()
     optimizer, scheduler, criteria = setup_lafter_training_utils(args, model)

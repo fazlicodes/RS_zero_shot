@@ -178,13 +178,13 @@ class LaFTerUFT(nn.Module):
 
             Path(f'embeddings').mkdir(parents=True, exist_ok=True)
 
-            # if os.path.isfile(f'embeddings/{self.txt_cls}_{self.dataset_name}_embeddings.pt'):
-            #     zeroshot_weights = torch.load(f'embeddings/{self.txt_cls}_{self.dataset_name}_embeddings.pt')
-            #     print('******** Loaded Already Saved Embeddings *********')
-            #     labels_for_descriptions = torch.tensor(labels_for_descriptions).cuda()
+            if os.path.isfile(f'embeddings/{self.txt_cls}_{self.dataset_name}_embeddings.pt'):
+                zeroshot_weights = torch.load(f'embeddings/{self.txt_cls}_{self.dataset_name}_embeddings.pt')
+                print('******** Loaded Already Saved Embeddings *********')
+                labels_for_descriptions = torch.tensor(labels_for_descriptions).cuda()
 
-            # else:
-            print('******** No Embeddings Found --- Saving New Embeddings *********')
+            else:
+                print('******** No Embeddings Found --- Saving New Embeddings *********')
 
             labels_for_descriptions = torch.tensor(labels_for_descriptions).cuda()
 
@@ -289,8 +289,8 @@ class LaFTerUFT(nn.Module):
         img_features_2 = self.incorporate_prompt(x2)
         img_features_2 = self.embeddings_after_prompts(img_features_2)
         # breakpoint()
-        img_features_adapter = self.vision_adapter(img_features_2)
-        img_features_adapter = self.adapter(img_features_adapter)
+        # img_features_adapter = self.vision_adapter(img_features_2)
+        img_features_adapter = self.adapter(img_features_2)
         return img_features_adapter
 
     def txt_cls_init(self):
@@ -310,7 +310,8 @@ class LaFTerUFT(nn.Module):
             svl_enc_apth = args.svl_model_path +'/'+args.dataset +f'/{args.dataset}_pretrained_encoder.pt'
             checkpoint_enc = torch.load(svl_enc_apth)
             self.svl_enc.load_state_dict(checkpoint_enc['state_dict'])
-            in_features = self.svl_enc.encoder.fc.in_features
+            # breakpoint()
+            in_features = self.svl_enc.feature_dim
             # freeze svl_enc and adapter
             for param in self.svl_enc.parameters():
                 param.requires_grad = False
