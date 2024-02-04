@@ -298,7 +298,7 @@ class LaFTerUFT(nn.Module):
         self.adapter_pl = copy.deepcopy(self.adapter)
         if self.cfg.classifer_random_weights:
             print('******** Initializing Classifier with Random Weights *********')
-            self.adapter_pl.apply(weights_init)
+            self.adapter.apply(weights_init)
 
         if self.cfg.ve_unshared:
             self.image_features_frozen = copy.deepcopy(self.model.visual)

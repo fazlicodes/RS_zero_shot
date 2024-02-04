@@ -17,6 +17,7 @@ final_output*/
 slurm-logs/
 submit.sh
 ssl_models/*
+scalemae_models/*
 scripts/*
 unshared_pl1_avg.sh
 # Python specific
