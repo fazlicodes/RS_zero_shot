@@ -7,7 +7,9 @@ from dassl.data.data_manager import DataManager
 from clip.simple_tokenizer import SimpleTokenizer as _Tokenizer
 from clip.clip import tokenize
 _tokenizer = _Tokenizer()
-from torchvision.models import resnet50
+from torchvision.models import resnet50, vit_l_16
+from .scalemae import vit_large_patch16 as scalemae_vit_large_patch16
+from .satmae import vit_large_patch16 as satmae_vit_large_patch16
 
 # import sys
 # sys.path.append("/l/users/sanoojan.baliah/Felix/LaFTer")
@@ -122,6 +124,10 @@ class LaFTerUFT(nn.Module):
         self.class_desc_emb = self.gen_emb()
         self.svl_enc = None
         self.svl_adapter = None
+        self.scalemae_env = None
+        self.scalemae_adapter = None
+        self.satmae_env = None
+        self.satmae_adapter = None
         
     def train_txt_clas(self, criteria):
         noise_std = 0.1
@@ -333,7 +339,45 @@ class LaFTerUFT(nn.Module):
         self.svl_adapter.load_state_dict(checkpoint_adapter) 
 
         for param in self.svl_adapter.parameters():
-            param.requires_grad = False 
+            param.requires_grad = False
+
+    def scalemae_init(self, args):
+        self.scalemae_env = scalemae_vit_large_patch16(img_size=224).to(self.device)
+        scalemae_enc_path = args.scalemae_path+f'/scalemae-vitlarge-800.pth'
+        in_features = self.scalemae_env.head.in_features
+        self.scalemae_env.head = torch.nn.Identity()
+        self.scalemae_env.load_state_dict(torch.load(scalemae_enc_path)['model'], strict=False)
+
+        for param in self.scalemae_env.parameters():
+            param.requires_grad = False
+
+        self.scalemae_adapter = AdapterMLP(num_classes=len(self.classes), input_size=in_features, hidden_size=256).to(self.device)
+        scalemae_adapter_path = args.scalemae_path+'/'+args.dataset+f'/scalemae_'+args.dataset+'_adapter.pt'
+        checkpoint_adapter = torch.load(scalemae_adapter_path)
+        self.scalemae_adapter.load_state_dict(checkpoint_adapter)
+
+        for param in self.scalemae_adapter.parameters():
+            param.requires_grad = False
+
+    def satmae_init(self, args):
+        self.satmae_env = satmae_vit_large_patch16(img_size=224).to(self.device)
+        satmae_enc_path = args.satmae_path+f'/fmow_pretrain.pth'
+        in_features = self.satmae_env.head.in_features
+        self.satmae_env.head = torch.nn.Identity()
+        self.satmae_env.load_state_dict(torch.load(satmae_enc_path)['model'], strict=False)
+
+        for param in self.satmae_env.parameters():
+            param.requires_grad = False
+
+        self.satmae_adapter = AdapterMLP(num_classes=len(self.classes), input_size=in_features, hidden_size=256).to(self.device)
+        satmae_adapter_path = args.satmae_path+'/'+f'/satmae_'+args.dataset+'_adapter.pt'
+        checkpoint_adapter = torch.load(satmae_adapter_path)
+        self.satmae_adapter.load_state_dict(checkpoint_adapter)
+
+        for param in self.satmae_adapter.parameters():
+            param.requires_grad = False
+
+
 
     def init_vision_adapter(self):
         # self.vision_adapter = nn.Sequential(
@@ -352,6 +396,17 @@ class LaFTerUFT(nn.Module):
         # with torch.no_grad():
         op = self.svl_enc(x, only_feats=True)
         op = self.svl_adapter(op['feat'])
+        return op
+    
+    def forward_scalemae(self, x):
+        res = torch.ones(x.shape[0])
+        op = self.scalemae_env(x, input_res=res)
+        op = self.scalemae_adapter(op)
+        return op
+    
+    def forward_satmae(self, x):
+        op = self.satmae_env(x)
+        op = self.satmae_adapter(op)
         return op
     
     def forward_vision_adapter(self, x):

@@ -18,6 +18,8 @@ slurm-logs/
 submit.sh
 ssl_models/*
 scalemae_models/*
+satmae_models/*
+svl_adapter_models2/*
 scripts/*
 unshared_pl1_avg.sh
 # Python specific

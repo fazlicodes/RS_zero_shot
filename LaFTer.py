@@ -241,6 +241,12 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
     if args.pl_technique=="pl_svl" or args.pl_technique=="pl_text_svl"  or args.pl_technique=="svl_only" or args.pl_technique=="vision_adapter":
         #  initialize the svl adapter
         model.svl_adapter_init(args=args)
+
+    if args.pl_technique=="scalemae":
+        model.scalemae_init(args=args)
+
+    if args.pl_technique=="satmae":
+        model.satmae_init(args=args)
     
     if args.ln_frozen:
         print("------LN Frozen------")
@@ -278,6 +284,8 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
         pl_zs_acc = lossmeter()
         pl_svl_acc = lossmeter()
         pl_vision_adapter_acc = lossmeter()
+        pl_scalemae_acc = lossmeter()
+        pl_satmae_acc = lossmeter()
         total_loss = lossmeter()
 
         zs_conf=lossmeter()
@@ -455,6 +463,24 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
                         # Ensure pseudo_label_text is 1D or flatten it
                         if pseudo_label_text.dim() > 1:
                             pseudo_label = pseudo_label_text.view(-1)
+
+                elif args.pl_technique=="scalemae":
+                    with torch.no_grad():
+                        output_scalemae = model.forward_scalemae(input[0])
+                        pseudo_label_pre_softmax = output_scalemae
+                        pseudo_label_scalemae = F.softmax(output_scalemae, dim=-1).argmax(dim=1, keepdim=True)
+                        pseudo_label_scalemae = pseudo_label_scalemae.flatten().cuda()
+                        pl_scalemae_acc.update((pseudo_label_scalemae == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
+                        pseudo_label = pseudo_label_scalemae
+
+                elif args.pl_technique=="satmae":
+                    with torch.no_grad():
+                        output_satmae = model.forward_satmae(input[0])
+                        pseudo_label_pre_softmax = output_satmae
+                        pseudo_label_satmae = F.softmax(output_satmae, dim=-1).argmax(dim=1, keepdim=True)
+                        pseudo_label_satmae = pseudo_label_satmae.flatten().cuda()
+                        pl_satmae_acc.update((pseudo_label_satmae == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
+                        pseudo_label = pseudo_label_satmae
                 
                 else:
                     raise NotImplementedError
@@ -500,6 +526,8 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
         print(f'Pseudo Label Zero Shot Accuracy: {pl_zs_acc.avg}')
         print(f'Pseudo Label SVL Accuracy: {pl_svl_acc.avg}')
         print(f'Pseudo Label Vision Adapter Accuracy: {pl_vision_adapter_acc.avg}')
+        print(f'Pseudo Label ScaleMAE Accuracy: {pl_scalemae_acc.avg}')
+        print(f'Pseudo Label SATMAE Accuracy: {pl_satmae_acc.avg}')
 
         best_test_acc=None
         if val_acc>best_acc:
@@ -658,10 +686,13 @@ if __name__ == "__main__":
     parser.add_argument('--desc_emb', action="store_true")
     # parser.add_argument('--svl_pl', action="store_true")
     parser.add_argument('--svl_model_path', type=str, default=None)
-    parser.add_argument('--pl_technique', type=str, default='None', choices=['None','pl_text', 'pl_svl', 'pl_text_svl','svl_only','vision_adapter'])
+    parser.add_argument('--pl_technique', type=str, default='None', choices=['None','pl_text', 'pl_svl', 'pl_text_svl','svl_only','vision_adapter','scalemae', 'satmae'])
     parser.add_argument('--dataset',type=str, required=True)
     parser.add_argument('--configuration',type=str, required=True, choices=['GeoRSCLIP', 'vit_b32','GeoRSCLIP_adapter'])
     parser.add_argument('--vision_adapter', action="store_true")
+    parser.add_argument('--scalemae_path', type=str, default=None, required=False)
+    parser.add_argument('--satmae_path', type=str, default=None)
+
     args = parser.parse_args()
     args.mile_stones = None
     
