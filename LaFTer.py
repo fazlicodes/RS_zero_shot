@@ -271,7 +271,7 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
 
     # Initialize early stopping parameters
     early_stopping_counter = 0
-    early_stopping_threshold = 20
+    early_stopping_threshold = 25
 
     for epoch in range(args.epochs):
         print(f'Epoch: {epoch}')
@@ -559,6 +559,7 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
     print(f'-------------------------------- Best Validation Accuracy Epoch: {all_acc.index(max(all_acc))} --------------------------------')
     
 def main(args):
+    start_seed()
     cfg = setup_cfg(args)
     cfg.DATALOADER.TRAIN_X.BATCH_SIZE = args.batch_size
     cfg.DATALOADER.TEST.BATCH_SIZE = args.batch_size
@@ -692,6 +693,7 @@ if __name__ == "__main__":
     parser.add_argument('--vision_adapter', action="store_true")
     parser.add_argument('--scalemae_path', type=str, default=None, required=False)
     parser.add_argument('--satmae_path', type=str, default=None)
+    parser.add_argument('--ssl_enc_path', type=str, default=None)
 
     args = parser.parse_args()
     args.mile_stones = None

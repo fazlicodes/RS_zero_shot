@@ -44,6 +44,47 @@ class GaussianBlur(object):
         x = x.filter(ImageFilter.GaussianBlur(radius=sigma))
         return x
 
+# # Create a class to represent the RandomAdjustSharpness transform (if not available in your torchvision.transforms)
+# class RandomAdjustSharpness(transforms.RandomAdjustSharpness):
+#     def __init__(self, sharpness_factor, p=0.5):
+#         super().__init__(sharpness_factor)
+#         self.p = p
+
+#     def __call__(self, img):
+#         if random.random() < self.p:
+#             return F.adjust_sharpness(img, self.sharpness)
+#         return img
+# def get_random_transform(ndim):
+#     # Normalization specific to the dataset being used
+#     normalize = transforms.Compose([
+#         transforms.ToTensor(),
+#         transforms.Normalize((0.48145466, 0.4578275, 0.40821073), 
+#                              (0.26862954, 0.26130258, 0.27577711))
+#     ])
+
+#     # Gaussian blur augmentation
+#     blur = GaussianBlur(kernel_size=(5, 9), sigma=(0.1, 5))
+
+#     # Additional augmentations
+#     random_rotation = transforms.RandomRotation(degrees=(0, 360))
+#     random_affine = transforms.RandomAffine(degrees=0, translate=(0.1, 0.1), scale=(0.8, 1.2), shear=10)
+#     random_perspective = transforms.RandomPerspective(distortion_scale=0.5, p=0.5)
+#     random_adjust_sharpness = RandomAdjustSharpness(sharpness_factor=2, p=0.5)
+    
+#     return transforms.Compose([
+#         transforms.RandomResizedCrop(ndim, scale=(0.2, 1.)),
+#         transforms.RandomHorizontalFlip(),
+#         transforms.RandomVerticalFlip(),
+#         random_rotation,
+#         random_affine,
+#         random_perspective,
+#         random_adjust_sharpness,
+#         transforms.RandomApply([
+#             transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)  # not strengthened
+#         ], p=0.8),
+#         blur,
+#         normalize
+#     ])
 
 def get_random_transform(ndim):
     normalize = transforms.Compose([transforms.ToTensor(),
@@ -51,6 +92,7 @@ def get_random_transform(ndim):
                                                          (0.26862954, 0.26130258, 0.27577711))])
 
     blur = GaussianBlur()
+    print('Brightness&Contrast')
 
     return transforms.Compose([
         transforms.RandomResizedCrop(ndim, scale=(0.2, 1.)),
@@ -58,7 +100,15 @@ def get_random_transform(ndim):
         transforms.RandomApply([
             transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)  # not strengthened
         ], p=0.8),
-        transforms.RandomGrayscale(p=0.2),
+        # transforms.AugMix(severity= 6,mixture_width=2),
+        # transforms.RandomResizedCrop(ndim, scale=(0.2, 1.)),
+        # transforms.RandAugment(2, 9),
+        # transforms.RandomGrayscale(p=0.2),
+        # transforms.RandomRotation(degrees=45),
+        # transforms.AutoAugment(),
+        # transforms.RandomAffine(degrees=45, translate=(0.2, 0.2), scale=(0.7, 1.3), shear=45),
+        # transforms.RandomPerspective(distortion_scale=0.2, p=0.5, interpolation=3),
+        transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1),
         blur,
         normalize
     ])
