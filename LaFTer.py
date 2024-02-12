@@ -301,19 +301,22 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
 
             optimizer.zero_grad()
 
-            with torch.no_grad():
-                output_text = model.forward_normal_for_pl(input[0])
-            out = model.forward_aug_with_prompts(input[1].float().cuda())
+            # with torch.no_grad():
+            #     output_text = model.forward_normal_for_pl(input[0])
+            # out = model.forward_aug_with_prompts(input[1].float().cuda())
 
-            pseudo_label = F.softmax(output_text, dim=-1)  # / 0.04
+            out = model.forward_aug_svl_again(input[1].float().cuda())
+            # breakpoint()
 
-            text_max_confs = pseudo_label.max(dim=1).values.float()
-            text_average_conf = torch.mean(text_max_confs)
-            text_conf.update(text_average_conf.item(), len(batch["label"]))
+            # pseudo_label = F.softmax(output_text, dim=-1)  # / 0.04
+
+            # text_max_confs = pseudo_label.max(dim=1).values.float()
+            # text_average_conf = torch.mean(text_max_confs)
+            # text_conf.update(text_average_conf.item(), len(batch["label"]))
             
-            pseudo_label = pseudo_label.argmax(dim=1, keepdim=True)
-            pseudo_label = pseudo_label.flatten().cuda()
-            pl_text_acc.update((pseudo_label == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
+            # pseudo_label = pseudo_label.argmax(dim=1, keepdim=True)
+            # pseudo_label = pseudo_label.flatten().cuda()
+            # pl_text_acc.update((pseudo_label == batch["label"].cuda()).sum().item() / len(batch["label"]), len(batch["label"]))
 
             if not args.text_only:
                 # clip_conf = output_zs.softmax(dim=-1).max(dim=-1).values.mean().item

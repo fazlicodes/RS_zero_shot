@@ -123,7 +123,9 @@ class LaFTerUFT(nn.Module):
         self.text_features = self.txt_features()
         self.class_desc_emb = self.gen_emb()
         self.svl_enc = None
+        self.svl_enc_trainable = None
         self.svl_adapter = None
+        self.svl_adapter_trainable = None
         self.scalemae_env = None
         self.scalemae_adapter = None
         self.satmae_env = None
@@ -299,6 +301,17 @@ class LaFTerUFT(nn.Module):
         img_features_adapter = self.adapter(img_features_2)
         return img_features_adapter
 
+    def forward_aug_svl_again(self, x2):
+        '''
+        :param x1: the clean image (without transforms, for pseudo labels, for teacher)
+        :param x2: the transformed image (for student)
+        :return: features adapter (cls head), pseudo-labels
+        '''
+        op = self.svl_enc_trainable(x2, only_feats=True)
+        op = self.svl_adapter_trainable(op['feat'])
+
+        return op
+
     def txt_cls_init(self):
         import copy
         self.adapter_pl = copy.deepcopy(self.adapter)
@@ -324,7 +337,7 @@ class LaFTerUFT(nn.Module):
         else:
             in_features = self.model.visual.output_dim
 
-        self.svl_adapter = AdapterMLP(num_classes=len(self.classes), input_size=in_features, hidden_size=256).to(self.device)
+        self.svl_adapter = AdapterMLP(num_classes=len(self.classes), input_size=in_features, hidden_size=256).to(self.device) 
         # breakpoint()
         if args.configuration == 'vit_b32':
             svl_adapter_path = args.svl_model_path +'/'+args.dataset + f'/clip_{args.dataset}_adapter.pt'
@@ -340,6 +353,15 @@ class LaFTerUFT(nn.Module):
 
         for param in self.svl_adapter.parameters():
             param.requires_grad = False
+
+        import copy
+        self.svl_adapter_trainable = copy.deepcopy(self.svl_adapter)
+        for param in self.svl_adapter_trainable.parameters():
+            param.requires_grad = True
+        
+        self.svl_enc_trainable = copy.deepcopy(self.svl_enc)
+        for param in self.svl_enc_trainable.parameters():
+            param.requires_grad = True
 
     def scalemae_init(self, args):
         self.scalemae_env = scalemae_vit_large_patch16(img_size=224).to(self.device)
