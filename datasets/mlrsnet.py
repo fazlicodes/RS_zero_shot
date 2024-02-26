@@ -10,62 +10,63 @@ from .dtd import DescribableTextures as DTD
 NEW_CNAMES = {
 "airplane":"airplane",
 "airport":"airport",
+"bareland":"bareland",
 "baseball_diamond":"baseball diamond",
 "basketball_court":"basketball court",
 "beach":"beach",
 "bridge":"bridge",
 "chaparral":"chaparral",
-"church":"church",
-"circular_farmland":"circular farmland",
 "cloud":"cloud",
 "commercial_area":"commercial area",
-"dense_residential":"dense residential",
+"dense_residential_area":"dense residential area",
 "desert":"desert",
+"farmland":"farmland",
 "forest":"forest",
 "freeway":"freeway",
 "golf_course":"golf course",
 "ground_track_field":"ground track field",
-"harbor":"harbor",
+"harbor&port":"harbor and/or port",
 "industrial_area":"industrial area",
 "intersection":"intersection",
 "island":"island",
 "lake":"lake",
 "meadow":"meadow",
-"medium_residential":"medium residential",
 "mobile_home_park":"mobile home park",
 "mountain":"mountain",
 "overpass":"overpass",
-"palace":"palace",
+"park":"park",
 "parking_lot":"parking lot",
+"parkway":"parkway",
 "railway":"railway",
 "railway_station":"railway station",
-"rectangular_farmland":"rectangular farmland",
 "river":"river",
 "roundabout":"roundabout",
-"runway":"runway",
-"sea_ice":"sea ice",
-"ship":"ship",
+"shipping_yard":"shipping yard",
 "snowberg":"snowberg",
-"sparse_residential":"sparse residential",
+"sparse_residential_area":"sparse residential area",
 "stadium":"stadium",
 "storage_tank":"storage tank",
+"swimmimg_pool":"swimmimg pool",
 "tennis_court":"tennis court",
 "terrace":"terrace",
-"thermal_power_station":"thermal power station",
-"wetland":"wetland",    
+"transmission_tower":"transmission tower",
+"vegetable_greenhouse":"vegetable greenhouse",
+"wetland":"wetland",
+"wind_turbine":"wind turbine",
 }
 
 
 @DATASET_REGISTRY.register()
-class RESISC45(DatasetBase):
+class MLRSNet(DatasetBase):
 
-    dataset_dir = "resisc45"
+    dataset_dir = "mlrsnet"
 
     def __init__(self, cfg):
         root = os.path.abspath(os.path.expanduser(cfg.DATASET.ROOT))
         self.dataset_dir = os.path.join(root, self.dataset_dir)
-        self.image_dir = os.path.join(self.dataset_dir, "NWPU-RESISC45")
-        self.split_path = os.path.join(self.dataset_dir, "resisc45_new_split.json")
+        self.image_dir = os.path.join(self.dataset_dir, "Images")
+        print("mlrs_split_new.json")
+        self.split_path = os.path.join(self.dataset_dir, "mlrsnet_split_new.json")
         self.split_fewshot_dir = os.path.join(self.dataset_dir, "split_fewshot")
         mkdir_if_missing(self.split_fewshot_dir)
 

@@ -15,7 +15,7 @@ import random
 from pathlib import Path
 
 
-lafter_datasets = ['DescribableTextures',  'EuroSAT','AID', 'PatternNet', 'OxfordFlowers', 'SUN397','RESISC45', 'UCF101', 'ImageNetR', 'ImageNetSketch',
+lafter_datasets = ['DescribableTextures',  'EuroSAT','AID', 'PatternNet', 'OxfordFlowers', 'SUN397','RESISC45','UCM','WHURS19','MLRSNet','Optimal31', 'UCF101', 'ImageNetR', 'ImageNetSketch',
                    'ImageNetA', 'CIFAR10_local', 'CIFAR100_local', 'ImageNet', 'Caltech101']
 
 
@@ -160,6 +160,10 @@ text_cls_epochs = {
     'EuroSAT': 400,
     'AID': 400,
     'RESISC45': 400,
+    'Optimal31': 400,
+    'WHURS19': 400,
+    'UCM': 400,
+    'MLRSNet': 400,
     'PatternNet': 400,
     'FGVCAircraft': 500,
     'Food101': 400,

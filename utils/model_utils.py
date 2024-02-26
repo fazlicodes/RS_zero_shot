@@ -92,7 +92,8 @@ def get_random_transform(ndim):
                                                          (0.26862954, 0.26130258, 0.27577711))])
 
     blur = GaussianBlur()
-    # print('Brightness&Contrast')
+    print('with_RandomPerspective & ColorJitter')
+    # print('with_RandomAug and RandomRot')
 
     return transforms.Compose([
         transforms.RandomResizedCrop(ndim, scale=(0.2, 1.)),
@@ -103,12 +104,13 @@ def get_random_transform(ndim):
         # transforms.AugMix(severity= 6,mixture_width=2),
         # transforms.RandomResizedCrop(ndim, scale=(0.2, 1.)),
         # transforms.RandAugment(2, 9),
-        # transforms.RandomGrayscale(p=0.2),
+        # # transforms.RandomGrayscale(p=0.2),
         # transforms.RandomRotation(degrees=45),
         # transforms.AutoAugment(),
         # transforms.RandomAffine(degrees=45, translate=(0.2, 0.2), scale=(0.7, 1.3), shear=45),
-        # transforms.RandomPerspective(distortion_scale=0.2, p=0.5, interpolation=3),
-        # transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1),
+        transforms.RandomPerspective(distortion_scale=0.2, p=0.5, interpolation=3),
+        transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1),
+        # transforms.center_crop(224),
         blur,
         normalize
     ])

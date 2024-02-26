@@ -95,7 +95,6 @@ class LaFTerUFT(nn.Module):
         self.dataset_templates = ds_templates
         self.classes = classes
         self.dataset_name = dataset_name
-        self.classes = classes
         self.txt_cls = txt_cls
         self.log = log
         patch_size = (16, 16)
@@ -160,12 +159,14 @@ class LaFTerUFT(nn.Module):
                 process_json_files('./descriptions/generic/ImageNet.json', f'./descriptions/generic/{self.dataset_name}.json', f'./descriptions/generic/{self.dataset_name}_noised.json', self.dataset_name, self.cfg.desc_noise)
                 path_to_file = f'./descriptions/generic/{self.dataset_name}_noised.json'
             else:
+                print('******** No Noise Added *********')
                 path_to_file = f'./descriptions/generic/{self.dataset_name}.json'
+                # path_to_file = f'/l/users/sanoojan.baliah/Felix/dataset_prep/descriptions/{self.dataset_name}_25_promptless_refined.json'
+                print(path_to_file)
 
 
             with open(path_to_file) as f:
                 gpt3_prompts = json.load(f)
-
             desc, labels_for_descriptions = gen_labels_with_descrptions(self.classes, descriptions=gpt3_prompts)
 
             templates, labels_for_templates = gen_labels_with_templates(self.classes, descriptions=self.dataset_templates)
@@ -313,7 +314,11 @@ class LaFTerUFT(nn.Module):
 
         if not args.vision_adapter:
             self.svl_enc = EmbModel(base_encoder=resnet50, args={'pretrained': True, 'projection_dim': 128, 'num_train': 1000, 'device': 'cuda', 'store_embeddings': False}).to(self.device)
-            svl_enc_apth = args.svl_model_path +'/'+args.dataset +f'/{args.dataset}_pretrained_encoder.pt'
+            if args.diff_encoder:
+                print('******** Different SSL Encoder *********')
+                svl_enc_apth = args.svl_model_path +'/'+args.diff_encoder +f'/{args.diff_encoder}_pretrained_encoder.pt'
+            else:            
+                svl_enc_apth = args.svl_model_path +'/'+args.dataset +f'/{args.dataset}_pretrained_encoder.pt'
             checkpoint_enc = torch.load(svl_enc_apth)
             self.svl_enc.load_state_dict(checkpoint_enc['state_dict'])
             # breakpoint()
@@ -329,7 +334,11 @@ class LaFTerUFT(nn.Module):
         if args.configuration == 'vit_b32':
             svl_adapter_path = args.svl_model_path +'/'+args.dataset + f'/clip_{args.dataset}_adapter.pt'
         elif args.configuration == 'GeoRSCLIP':
-            svl_adapter_path = args.svl_model_path +'/'+args.dataset + f'/{args.dataset}_adapter.pt'
+            if args.diff_encoder:
+                print(f'******** Adapter trained on different SSL Encoder - {args.diff_encoder}*********')
+                svl_adapter_path = args.svl_model_path +'/'+args.dataset + f'/{args.diff_encoder}_{args.dataset}_adapter.pt'
+            else:
+                svl_adapter_path = args.svl_model_path +'/'+args.dataset + f'/{args.dataset}_adapter.pt'
         elif args.configuration == 'GeoRSCLIP_adapter':
             svl_adapter_path = args.svl_model_path +'/'+args.dataset + f'/GeoRSCLIP_{args.dataset}_adapter.pt'
         else:
@@ -467,14 +476,24 @@ class LaFTer(TrainerX):
     def build_model(self):
         cfg = self.cfg
         classnames = self.dm.dataset.classnames
+        # breakpoint()
+        #TO BE FIXED
+        if 'AnnualCrop' in classnames:
+            # breakpoint()
+            classnames = ['Annual Crop Land', 'Forest', 'Herbaceous Vegetation Land', 'Highway or Road', 'Industrial Buildings', 'Pasture Land', 'Permanent Crop Land', 'Residential Buildings', 'River', 'Sea or Lake']
 
         print(f"Loading CLIP (backbone: {cfg.MODEL.BACKBONE.NAME})")
         clip_model = load_clip_to_cpu(cfg)
         if cfg.TRAINER.COOP.PREC == "fp32" or cfg.TRAINER.COOP.PREC == "amp":
             clip_model.float()
         print("Building ZERO-SHOT-MODEL CLIP")
+        text_pr = "a satellite photo of {}"
+        # text_pr = "a land use image of {}"
+        # text_pr = "a satellite photo of {}"
+        print(f"Using prompt: {text_pr}")
         self.model = LaFTerUFT(model=clip_model, classes=classnames,
-                                          templates=['a photo of a {}'], ds_templates = ds_specific_templates[cfg.DATASET.NAME], dataset_name= cfg.DATASET.NAME, txt_cls = cfg.txt_cls, cfg=cfg)
+                                          templates=[text_pr], ds_templates = ds_specific_templates[cfg.DATASET.NAME], dataset_name= cfg.DATASET.NAME, txt_cls = cfg.txt_cls, cfg=cfg)
+        print("DS Specific Templates: ", ds_specific_templates[cfg.DATASET.NAME])
         self.register_model("adapt", self.model)
         device_count = torch.cuda.device_count()
         if device_count > 1:

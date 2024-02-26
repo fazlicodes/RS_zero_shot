@@ -27,8 +27,13 @@ from utils.utils import *
 import os
 from dassl.utils import Registry
 from datasets import RESISC45
+from datasets import Optimal31
+from datasets import MLRSNet
+from datasets import UCM
 from datasets import AID
 from datasets import PatternNet
+from datasets import WHURS19
+import wandb
 
 def print_args(args, cfg):
     print("***************")
@@ -271,7 +276,10 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
 
     # Initialize early stopping parameters
     early_stopping_counter = 0
-    early_stopping_threshold = 25
+    early_stopping_threshold = 30
+
+    if args.dataset=="mlrsnet" or args.dataset=="aid":
+        early_stopping_threshold=15
 
     for epoch in range(args.epochs):
         print(f'Epoch: {epoch}')
@@ -529,6 +537,8 @@ def train_lafter(args, model, tr_loader, val_loader, test_loader=None):
         print(f'Pseudo Label ScaleMAE Accuracy: {pl_scalemae_acc.avg}')
         print(f'Pseudo Label SATMAE Accuracy: {pl_satmae_acc.avg}')
 
+        wandb.log({"Epoch": epoch, "PS Text Acc": pl_text_acc.avg, "PS ZS Acc": pl_zs_acc.avg, "Epoch Loss": total_loss.avg, "Validation Accuracy": val_acc, "Best Model": best_acc})
+
         best_test_acc=None
         if val_acc>best_acc:
             best_val_acc="Yes"
@@ -582,6 +592,10 @@ def main(args):
     dataset_registary = Registry("Dataset")
 
     dataset_registary.register(RESISC45)
+    dataset_registary.register(UCM)
+    dataset_registary.register(WHURS19)
+    dataset_registary.register(MLRSNet)
+    dataset_registary.register(Optimal31)
 
     trainer = build_trainer(cfg)
     model = trainer.model
@@ -694,9 +708,20 @@ if __name__ == "__main__":
     parser.add_argument('--scalemae_path', type=str, default=None, required=False)
     parser.add_argument('--satmae_path', type=str, default=None)
     parser.add_argument('--ssl_enc_path', type=str, default=None)
+    parser.add_argument('--diff_encoder', type=str, default=None)
+    parser.add_argument('--wandb_run_name', type=str, default=None)
 
     args = parser.parse_args()
     args.mile_stones = None
+
+    wandb.init(
+        # set the wandb project where this run will be logged
+        project="final_cj",
+        name= args.wandb_run_name,
+        
+        # track hyperparameters and run metadata
+        config=args
+    )
     
     main(args)
 

@@ -8,64 +8,38 @@ from .oxford_pets import OxfordPets
 from .dtd import DescribableTextures as DTD
 
 NEW_CNAMES = {
-"airplane":"airplane",
-"airport":"airport",
-"baseball_diamond":"baseball diamond",
-"basketball_court":"basketball court",
-"beach":"beach",
-"bridge":"bridge",
-"chaparral":"chaparral",
-"church":"church",
-"circular_farmland":"circular farmland",
-"cloud":"cloud",
-"commercial_area":"commercial area",
-"dense_residential":"dense residential",
-"desert":"desert",
-"forest":"forest",
-"freeway":"freeway",
-"golf_course":"golf course",
-"ground_track_field":"ground track field",
-"harbor":"harbor",
-"industrial_area":"industrial area",
-"intersection":"intersection",
-"island":"island",
-"lake":"lake",
-"meadow":"meadow",
-"medium_residential":"medium residential",
-"mobile_home_park":"mobile home park",
-"mountain":"mountain",
-"overpass":"overpass",
-"palace":"palace",
-"parking_lot":"parking lot",
-"railway":"railway",
-"railway_station":"railway station",
-"rectangular_farmland":"rectangular farmland",
-"river":"river",
-"roundabout":"roundabout",
-"runway":"runway",
-"sea_ice":"sea ice",
-"ship":"ship",
-"snowberg":"snowberg",
-"sparse_residential":"sparse residential",
-"stadium":"stadium",
-"storage_tank":"storage tank",
-"tennis_court":"tennis court",
-"terrace":"terrace",
-"thermal_power_station":"thermal power station",
-"wetland":"wetland",    
+"Airport":"Airport",
+"Beach":"Beach",
+"Bridge":"Bridge",
+"Commercial":"Commercial",
+"Desert":"Desert",
+"Farmland":"Farmland",
+"footballField":"Football Field",
+"Forest":"Forest",
+"Industrial":"Industrial",
+"Meadow":"Meadow",
+"Mountain":"Mountain",
+"Park":"Park",
+"Parking":"Parking",
+"Pond":"Pond",
+"Port":"Port",
+"railwayStation":"railwayStation",
+"Residential":"Residential",
+"River":"River",
+"Viaduct":"Viaduct"
 }
 
 
 @DATASET_REGISTRY.register()
-class RESISC45(DatasetBase):
+class WHURS19(DatasetBase):
 
-    dataset_dir = "resisc45"
+    dataset_dir = "whurs19"
 
     def __init__(self, cfg):
         root = os.path.abspath(os.path.expanduser(cfg.DATASET.ROOT))
         self.dataset_dir = os.path.join(root, self.dataset_dir)
-        self.image_dir = os.path.join(self.dataset_dir, "NWPU-RESISC45")
-        self.split_path = os.path.join(self.dataset_dir, "resisc45_new_split.json")
+        self.image_dir = os.path.join(self.dataset_dir, "WHURS19")
+        self.split_path = os.path.join(self.dataset_dir, "whurs19_split.json")
         self.split_fewshot_dir = os.path.join(self.dataset_dir, "split_fewshot")
         mkdir_if_missing(self.split_fewshot_dir)
 

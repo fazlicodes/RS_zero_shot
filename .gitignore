@@ -5,6 +5,17 @@ Dassl.pytorch/
 output*/
 scripts/.*
 test/
+_old_aspo*/
+aid_only*/
+all_output/
+final_*/
+mlrsnet*.pt
+not_needed/
+old_promp*/
+updated_pr*/
+wandb/
+acsp*/
+pt100*/
 test*/
 .nfs*
 configs/trainers/text_cls/*

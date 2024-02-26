@@ -8,70 +8,26 @@ from .oxford_pets import OxfordPets
 from .dtd import DescribableTextures as DTD
 
 NEW_CNAMES = {
-"airplane":"airplane",
-"airport":"airport",
-"baseball_diamond":"baseball diamond",
-"basketball_court":"basketball court",
-"beach":"beach",
-"bridge":"bridge",
-"chaparral":"chaparral",
-"church":"church",
-"circular_farmland":"circular farmland",
-"cloud":"cloud",
-"commercial_area":"commercial area",
-"dense_residential":"dense residential",
-"desert":"desert",
-"forest":"forest",
-"freeway":"freeway",
-"golf_course":"golf course",
-"ground_track_field":"ground track field",
-"harbor":"harbor",
-"industrial_area":"industrial area",
-"intersection":"intersection",
-"island":"island",
-"lake":"lake",
-"meadow":"meadow",
-"medium_residential":"medium residential",
-"mobile_home_park":"mobile home park",
-"mountain":"mountain",
-"overpass":"overpass",
-"palace":"palace",
-"parking_lot":"parking lot",
-"railway":"railway",
-"railway_station":"railway station",
-"rectangular_farmland":"rectangular farmland",
-"river":"river",
-"roundabout":"roundabout",
-"runway":"runway",
-"sea_ice":"sea ice",
-"ship":"ship",
-"snowberg":"snowberg",
-"sparse_residential":"sparse residential",
-"stadium":"stadium",
-"storage_tank":"storage tank",
-"tennis_court":"tennis court",
-"terrace":"terrace",
-"thermal_power_station":"thermal power station",
-"wetland":"wetland",    
 }
 
 
 @DATASET_REGISTRY.register()
-class RESISC45(DatasetBase):
+class Optimal31(DatasetBase):
 
-    dataset_dir = "resisc45"
+    dataset_dir = "optimal31"
 
     def __init__(self, cfg):
         root = os.path.abspath(os.path.expanduser(cfg.DATASET.ROOT))
         self.dataset_dir = os.path.join(root, self.dataset_dir)
-        self.image_dir = os.path.join(self.dataset_dir, "NWPU-RESISC45")
-        self.split_path = os.path.join(self.dataset_dir, "resisc45_new_split.json")
+        self.image_dir = os.path.join(self.dataset_dir, "Images")
+        self.split_path = os.path.join(self.dataset_dir, "optimal31_dataset_new_split.json")
         self.split_fewshot_dir = os.path.join(self.dataset_dir, "split_fewshot")
         mkdir_if_missing(self.split_fewshot_dir)
 
         if os.path.exists(self.split_path):
             train_, val_, test_ = OxfordPets.read_split(self.split_path, self.image_dir)
         else:
+            breakpoint()
             train_, val_, test_ = DTD.read_and_split_data(self.image_dir, new_cnames=NEW_CNAMES)
             OxfordPets.save_split(train_, val_, test_, self.split_path, self.image_dir)
 
